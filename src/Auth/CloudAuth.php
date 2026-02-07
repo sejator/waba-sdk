@@ -62,6 +62,7 @@ class CloudAuth
             'client_id'     => $this->appId,
             'client_secret' => $this->appSecret,
             'code'          => $code,
+            'grant_type'    => 'authorization_code',
         ];
 
         if ($redirectUri) {
@@ -78,7 +79,11 @@ class CloudAuth
                 'status' => $tokenRes->status(),
                 'body'   => $tokenRes->json(),
             ]);
-            throw new WabaException('Failed to exchange OAuth code');
+
+            $metaError = $tokenRes->json('error.message');
+            throw new WabaException(
+                $metaError ?? 'Failed to exchange OAuth code'
+            );
         }
 
         $accessToken = $tokenRes->json('access_token');
@@ -112,7 +117,8 @@ class CloudAuth
         foreach ($data['granular_scopes'] as $scope) {
 
             if ($scope['scope'] === 'whatsapp_business_management') {
-                $wabaId = $scope['target_ids'][0] ?? null;
+                $wabaIds = $scope['target_ids'] ?? [];
+                $wabaId  = $wabaIds[0] ?? null;
 
                 $businessId =
                     $scope['business_id']
@@ -121,7 +127,8 @@ class CloudAuth
             }
 
             if ($scope['scope'] === 'whatsapp_business_messaging') {
-                $phoneId = $scope['target_ids'][0] ?? null;
+                $phoneIds = $scope['target_ids'] ?? [];
+                $phoneId  = $phoneIds[0] ?? null;
             }
         }
 
