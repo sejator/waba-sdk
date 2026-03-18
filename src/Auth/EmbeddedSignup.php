@@ -31,9 +31,14 @@ class EmbeddedSignup
         return new self();
     }
 
-    public function clientId(string $clientId): self
+    public function clientId(?string $clientId = null): self
     {
-        $this->clientId = $clientId;
+        $this->clientId = $clientId ?? config('waba.meta.app_id');
+
+        if (!$this->clientId) {
+            throw new RuntimeException('client_id tidak tersedia');
+        }
+
         return $this;
     }
 
@@ -53,9 +58,9 @@ class EmbeddedSignup
         return $this;
     }
 
-    public function scope(string $scope): self
+    public function scope(?string $scope = null): self
     {
-        $this->scope = $scope;
+        $this->scope = $scope ?? config('waba.meta.oauth.scope');
         return $this;
     }
 

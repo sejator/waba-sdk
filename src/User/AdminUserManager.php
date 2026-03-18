@@ -2,7 +2,7 @@
 
 namespace Sejator\WabaSdk\User;
 
-use Illuminate\Support\Facades\Http;
+use Illuminate\Http\Client\Factory as HttpFactory;
 use Sejator\WabaSdk\Exceptions\WabaException;
 
 class AdminUserManager
@@ -11,12 +11,12 @@ class AdminUserManager
     protected string $appId;
     protected string $appToken;
 
-    protected ?string $businessId = null;
-    protected ?string $wabaId     = null;
-    protected ?string $userId     = null;
+    protected HttpFactory $http;
 
-    public function __construct()
+    public function __construct(HttpFactory $http)
     {
+        $this->http = $http;
+
         $this->graph = rtrim(config('waba.meta.graph.base_url'), '/')
             . '/' . config('waba.meta.graph.version');
 
@@ -31,66 +31,44 @@ class AdminUserManager
         }
     }
 
-    public function forBusiness(string $businessId): self
-    {
-        $this->businessId = $businessId;
-        return $this;
-    }
+    public function createSystemUser(
+        string $businessId,
+        string $name = 'WABA System User'
+    ): string {
+        $this->validateId($businessId, 'businessId');
 
-    public function forWaba(string $wabaId): self
-    {
-        $this->wabaId = $wabaId;
-        return $this;
-    }
-
-    public function createSystemUser(string $name = 'WABA System User'): self
-    {
-        if (!$this->businessId) {
-            throw new WabaException('businessId is required');
-        }
-
-        $res = Http::withToken($this->appToken)->post(
-            "{$this->graph}/{$this->businessId}/system_users",
+        $res = $this->request()->post(
+            "{$this->graph}/{$businessId}/system_users",
             ['name' => $name]
         );
 
-        if (!$res->successful()) {
-            throw new WabaException('Failed to create system user');
-        }
-
-        $this->userId = $res->json('id');
-        return $this;
+        return $res->json('id');
     }
 
-    public function assignWabaAsset(): self
-    {
-        if (!$this->userId || !$this->wabaId) {
-            throw new WabaException('userId and wabaId are required');
-        }
+    public function assignWabaAsset(
+        string $userId,
+        string $wabaId
+    ): bool {
+        $this->validateId($userId, 'userId');
+        $this->validateId($wabaId, 'wabaId');
 
-        $res = Http::withToken($this->appToken)->post(
-            "{$this->graph}/{$this->userId}/assigned_assets",
+        $this->request()->post(
+            "{$this->graph}/{$userId}/assigned_assets",
             [
-                'asset' => $this->wabaId,
+                'asset' => $wabaId,
                 'role'  => 'ADMIN',
             ]
         );
 
-        if (!$res->successful()) {
-            throw new WabaException('Failed to assign WABA asset');
-        }
-
-        return $this;
+        return true;
     }
 
-    public function generateToken(): UserToken
+    public function generateToken(string $userId): UserToken
     {
-        if (!$this->userId) {
-            throw new WabaException('userId is required');
-        }
+        $this->validateId($userId, 'userId');
 
-        $res = Http::withToken($this->appToken)->post(
-            "{$this->graph}/{$this->userId}/access_tokens",
+        $res = $this->request()->post(
+            "{$this->graph}/{$userId}/access_tokens",
             [
                 'app_id' => $this->appId,
                 'scope'  => [
@@ -100,13 +78,24 @@ class AdminUserManager
             ]
         );
 
-        if (!$res->successful()) {
-            throw new WabaException('Failed to generate system user token');
-        }
-
         return new UserToken(
-            $this->userId,
+            $userId,
             $res->json('access_token')
         );
+    }
+
+    protected function request()
+    {
+        return $this->http
+            ->withToken($this->appToken)
+            ->timeout(config('waba.http.timeout', 10))
+            ->retry(3, 500);
+    }
+
+    protected function validateId(string $value, string $field): void
+    {
+        if (empty($value)) {
+            throw new WabaException("{$field} is required");
+        }
     }
 }

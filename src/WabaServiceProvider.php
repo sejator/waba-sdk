@@ -3,6 +3,8 @@
 namespace Sejator\WabaSdk;
 
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Http\Client\Factory as HttpFactory;
+use Sejator\WabaSdk\Http\WabaClient;
 
 class WabaServiceProvider extends ServiceProvider
 {
@@ -13,11 +15,20 @@ class WabaServiceProvider extends ServiceProvider
             'waba'
         );
 
-        $this->app->singleton('waba', function () {
-            return new WabaManager();
+        $this->app->singleton(WabaClient::class, function ($app) {
+            return new WabaClient(
+                config('waba.token'),
+                $app->make(HttpFactory::class)
+            );
         });
 
-        $this->app->alias('waba', WabaManager::class);
+        $this->app->singleton(WabaManager::class, function ($app) {
+            return new WabaManager(
+                $app->make(WabaClient::class)
+            );
+        });
+
+        $this->app->alias(WabaManager::class, 'waba');
     }
 
     public function boot(): void

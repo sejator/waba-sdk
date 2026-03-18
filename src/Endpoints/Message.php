@@ -101,6 +101,33 @@ class Message
         ]);
     }
 
+    /**
+     * Mark message as read
+     */
+    public function markAsRead(string $messageId): array
+    {
+        if (empty($messageId)) {
+            throw new WabaException('messageId is required');
+        }
+
+        return $this->client->post(
+            "{$this->phoneNumberId}/messages",
+            [
+                'messaging_product' => 'whatsapp',
+                'status' => 'read',
+                'message_id' => $messageId,
+            ]
+        );
+    }
+
+    /**
+     * Custom payload (advanced usage)
+     */
+    public function custom(string $to, array $payload): array
+    {
+        return $this->send($payload['type'] ?? 'text', $to, $payload);
+    }
+
     protected function send(
         string $type,
         string $to,

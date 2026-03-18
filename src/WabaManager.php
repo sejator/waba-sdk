@@ -2,7 +2,6 @@
 
 namespace Sejator\WabaSdk;
 
-use RuntimeException;
 use Sejator\WabaSdk\Http\WabaClient;
 use Sejator\WabaSdk\Endpoints\Media;
 use Sejator\WabaSdk\Endpoints\Message;
@@ -18,45 +17,41 @@ use Sejator\WabaSdk\Webhook\WebhookVerifier;
 
 class WabaManager
 {
-    protected ?string $accessToken = null;
+    protected WabaClient $client;
 
-    public function withAccessToken(string $accessToken): self
+    public function __construct(WabaClient $client)
     {
-        $this->accessToken = $accessToken;
-        return $this;
+        $this->client = $client;
     }
 
-    protected function client(): WabaClient
+    /**
+     * Override token (optional - for multi-tenant)
+     */
+    public function withAccessToken(string $accessToken): self
     {
-        if (!$this->accessToken) {
-            throw new RuntimeException(
-                'WABA access token not set. Call withAccessToken($token) first.'
-            );
-        }
-
-        return new WabaClient($this->accessToken);
+        return new self(new WabaClient($accessToken));
     }
 
     /* ---------------- Messaging APIs ---------------- */
 
     public function messages(string $phoneNumberId): Message
     {
-        return new Message($this->client(), $phoneNumberId);
+        return new Message($this->client, $phoneNumberId);
     }
 
     public function templates(string $wabaId): Template
     {
-        return new Template($this->client(), $wabaId);
+        return new Template($this->client, $wabaId);
     }
 
     public function media(): Media
     {
-        return new Media($this->client());
+        return new Media($this->client);
     }
 
     public function phoneNumbers(): PhoneNumber
     {
-        return new PhoneNumber($this->client());
+        return new PhoneNumber($this->client);
     }
 
     /* ---------------- Embedded Signup ---------------- */
@@ -77,6 +72,7 @@ class WabaManager
     }
 
     /* ---------------- Webhook ---------------- */
+
     public function parseWebhook(string $rawPayload): WebhookPayload
     {
         return new WebhookPayload($rawPayload);
@@ -96,25 +92,23 @@ class WabaManager
 
     /* ---------------- User Managers ---------------- */
 
-    /** BSP / Admin setup */
     public function admin(): AdminUserManager
     {
         return new AdminUserManager();
     }
 
-    /** Embedded Signup */
     public function embedded(): EmbeddedUserManager
     {
-        return new EmbeddedUserManager($this->client());
+        return new EmbeddedUserManager($this->client);
     }
 
     public function credit(): CreditManager
     {
-        return new CreditManager($this->client());
+        return new CreditManager($this->client);
     }
 
     public function mode(): string
     {
-        return config('waba.meta.mode');
+        return config('waba.meta.mode', 'production');
     }
 }

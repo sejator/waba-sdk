@@ -2,7 +2,7 @@
 
 namespace Sejator\WabaSdk\Auth;
 
-use Illuminate\Support\Facades\Http;
+use Illuminate\Http\Client\Factory as HttpFactory;
 use Illuminate\Support\Facades\Log;
 use Sejator\WabaSdk\Exceptions\WabaException;
 
@@ -13,8 +13,12 @@ class CloudAuth
     protected string $appId;
     protected string $appSecret;
 
-    public function __construct()
+    protected HttpFactory $http;
+
+    public function __construct(HttpFactory $http)
     {
+        $this->http = $http;
+
         $this->graphUrl  = rtrim(config('waba.meta.graph.base_url'), '/');
         $this->version   = config('waba.meta.graph.version');
         $this->appId     = config('waba.meta.app_id');
@@ -25,23 +29,11 @@ class CloudAuth
         }
     }
 
-    /**
-     * ============================================================
-     * Embedded Signup
-     * NO redirect_uri
-     * ============================================================
-     */
     public function exchangeEmbeddedCode(string $code): array
     {
         return $this->exchange($code, null);
     }
 
-    /**
-     * ============================================================
-     * Manual OAuth (Redirect-based)
-     * WITH redirect_uri
-     * ============================================================
-     */
     public function exchangeOAuthCode(string $code, string $redirectUri): array
     {
         if (!filter_var($redirectUri, FILTER_VALIDATE_URL)) {
@@ -51,11 +43,6 @@ class CloudAuth
         return $this->exchange($code, $redirectUri);
     }
 
-    /**
-     * ============================================================
-     * OAuth exchange logic
-     * ============================================================
-     */
     protected function exchange(string $code, ?string $redirectUri): array
     {
         $payload = [
@@ -69,20 +56,21 @@ class CloudAuth
             $payload['redirect_uri'] = $redirectUri;
         }
 
-        $tokenRes = Http::asForm()->post(
+        $http = $this->http
+            ->asForm()
+            ->timeout(config('waba.http.timeout', 10))
+            ->retry(3, 500);
+
+        $tokenRes = $http->post(
             "{$this->graphUrl}/{$this->version}/oauth/access_token",
             $payload
         );
 
         if (!$tokenRes->successful()) {
-            Log::error('META OAUTH TOKEN EXCHANGE FAILED', [
-                'status' => $tokenRes->status(),
-                'body'   => $tokenRes->json(),
-            ]);
+            $this->logMetaError('TOKEN_EXCHANGE_FAILED', $tokenRes);
 
-            $metaError = $tokenRes->json('error.message');
             throw new WabaException(
-                $metaError ?? 'Failed to exchange OAuth code'
+                $tokenRes->json('error.message') ?? 'Failed to exchange OAuth code'
             );
         }
 
@@ -92,7 +80,7 @@ class CloudAuth
             throw new WabaException('Access token missing from Meta response');
         }
 
-        $debugRes = Http::get(
+        $debugRes = $http->get(
             "{$this->graphUrl}/{$this->version}/debug_token",
             [
                 'input_token'  => $accessToken,
@@ -101,6 +89,7 @@ class CloudAuth
         );
 
         if (!$debugRes->successful()) {
+            $this->logMetaError('DEBUG_TOKEN_FAILED', $debugRes);
             throw new WabaException('Failed to debug Meta access token');
         }
 
@@ -110,64 +99,19 @@ class CloudAuth
             throw new WabaException('granular_scopes missing from Meta token');
         }
 
-        $wabaId     = null;
-        $phoneId    = null;
-        $businessId = null;
-
-        foreach ($data['granular_scopes'] as $scope) {
-
-            if ($scope['scope'] === 'whatsapp_business_management') {
-                $wabaIds = $scope['target_ids'] ?? [];
-                $wabaId  = $wabaIds[0] ?? null;
-
-                $businessId =
-                    $scope['business_id']
-                    ?? $scope['asset_id']
-                    ?? null;
-            }
-
-            if ($scope['scope'] === 'whatsapp_business_messaging') {
-                $phoneIds = $scope['target_ids'] ?? [];
-                $phoneId  = $phoneIds[0] ?? null;
-            }
-        }
+        [$wabaId, $phoneId, $businessId] = $this->extractScopes($data['granular_scopes']);
 
         if (!$wabaId || !$phoneId) {
-            throw new WabaException(
-                'WABA or phone_number_id not found in token scopes'
-            );
+            throw new WabaException('WABA or phone_number_id not found in token scopes');
         }
 
-        if (!$businessId) {
-            Log::warning('BUSINESS ID NOT FOUND IN GRANULAR SCOPES', [
-                'scopes' => $data['granular_scopes'],
-            ]);
-        }
+        $wabaName = $this->fetchWabaName($accessToken, $wabaId);
 
-        $wabaName = null;
+        $expiresAt = $this->resolveExpiry($data);
 
-        $wabaRes = Http::withToken($accessToken)->get(
-            "{$this->graphUrl}/{$this->version}/{$wabaId}",
-            [
-                'fields' => 'id,name',
-            ]
-        );
-
-        if ($wabaRes->successful()) {
-            $wabaName = $wabaRes->json('name');
-        }
-
-        $expiresAt = null;
-        if (!empty($data['expires_at'])) {
-            $expiresAt = now()->addSeconds(
-                max(0, $data['expires_at'] - time())
-            );
-        }
-
-        Log::info('WABA OAUTH EXCHANGE SUCCESS', [
-            'waba_id'     => $wabaId,
-            'phone_id'    => $phoneId,
-            'business_id' => $businessId,
+        Log::info('WABA OAUTH SUCCESS', [
+            'waba_id'  => $wabaId,
+            'phone_id' => $phoneId,
         ]);
 
         return [
@@ -178,5 +122,54 @@ class CloudAuth
             'business_id'      => (string) $businessId,
             'waba_name'        => $wabaName,
         ];
+    }
+
+    protected function extractScopes(array $scopes): array
+    {
+        $wabaId = $phoneId = $businessId = null;
+
+        foreach ($scopes as $scope) {
+
+            if ($scope['scope'] === 'whatsapp_business_management') {
+                $wabaId = $scope['target_ids'][0] ?? null;
+                $businessId = $scope['business_id'] ?? $scope['asset_id'] ?? null;
+            }
+
+            if ($scope['scope'] === 'whatsapp_business_messaging') {
+                $phoneId = $scope['target_ids'][0] ?? null;
+            }
+        }
+
+        return [$wabaId, $phoneId, $businessId];
+    }
+
+    protected function fetchWabaName(string $token, string $wabaId): ?string
+    {
+        $res = $this->http
+            ->withToken($token)
+            ->get("{$this->graphUrl}/{$this->version}/{$wabaId}", [
+                'fields' => 'id,name',
+            ]);
+
+        return $res->successful() ? $res->json('name') : null;
+    }
+
+    protected function resolveExpiry(array $data): ?\Carbon\Carbon
+    {
+        if (empty($data['expires_at'])) {
+            return null;
+        }
+
+        return now()->addSeconds(
+            max(0, $data['expires_at'] - time())
+        );
+    }
+
+    protected function logMetaError(string $context, $response): void
+    {
+        Log::error("META {$context}", [
+            'status' => $response->status(),
+            'body'   => $response->json(),
+        ]);
     }
 }

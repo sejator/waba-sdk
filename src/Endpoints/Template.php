@@ -2,6 +2,7 @@
 
 namespace Sejator\WabaSdk\Endpoints;
 
+use InvalidArgumentException;
 use Sejator\WabaSdk\Http\WabaClient;
 
 class Template
@@ -28,6 +29,10 @@ class Template
      */
     public function create(array $payload): array
     {
+        if (empty($payload)) {
+            throw new InvalidArgumentException('payload is required');
+        }
+
         return $this->client->post(
             "{$this->wabaId}/message_templates",
             $payload
@@ -39,6 +44,10 @@ class Template
      */
     public function delete(string $name, string $language): array
     {
+        if (!$name || !$language) {
+            throw new InvalidArgumentException('name & language required');
+        }
+
         return $this->client->delete(
             "{$this->wabaId}/message_templates",
             [

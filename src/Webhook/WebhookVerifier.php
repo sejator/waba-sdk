@@ -2,6 +2,8 @@
 
 namespace Sejator\WabaSdk\Webhook;
 
+use Illuminate\Support\Facades\Log;
+
 class WebhookVerifier
 {
     /**
@@ -13,13 +15,15 @@ class WebhookVerifier
      * @param string      $payload   Raw request body
      * @param string      $appSecret Meta App Secret
      * @param string|null $signature Header X-Hub-Signature-256
-     *
+     * @param bool        $throw
+     * 
      * @return bool
      */
     public static function verify(
         string $payload,
         string $appSecret,
         ?string $signature,
+        bool $throw = false
     ): bool {
         if (
             empty($payload) ||
@@ -27,7 +31,7 @@ class WebhookVerifier
             empty($appSecret) ||
             !str_starts_with($signature, 'sha256=')
         ) {
-            return false;
+            return self::fail('Invalid signature format', $throw);
         }
 
         $expected = 'sha256=' . hash_hmac(
@@ -36,6 +40,23 @@ class WebhookVerifier
             $appSecret
         );
 
-        return hash_equals($expected, $signature);
+        if (!hash_equals($expected, $signature)) {
+            return self::fail('Signature mismatch', $throw);
+        }
+
+        return true;
+    }
+
+    protected static function fail(string $message, bool $throw): bool
+    {
+        Log::warning('WABA WEBHOOK SIGNATURE FAILED', [
+            'reason' => $message,
+        ]);
+
+        if ($throw) {
+            throw new \RuntimeException($message);
+        }
+
+        return false;
     }
 }

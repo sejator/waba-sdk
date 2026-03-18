@@ -28,10 +28,26 @@ class Media
     }
 
     /**
-     * Retrieve media info / download URL
+     * Get media metadata (url, mime, size)
      */
     public function retrieve(string $mediaId): array
     {
+        if (empty($mediaId)) {
+            throw new WabaException('mediaId is required');
+        }
+
         return $this->client->get($mediaId);
+    }
+
+    /**
+     * Delete media (optional but useful)
+     */
+    public function delete(string $mediaId): array
+    {
+        if (empty($mediaId)) {
+            throw new WabaException('mediaId is required');
+        }
+
+        return $this->client->delete($mediaId);
     }
 }

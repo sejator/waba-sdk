@@ -2,6 +2,7 @@
 
 namespace Sejator\WabaSdk\Webhook;
 
+use Illuminate\Support\Arr;
 use RuntimeException;
 
 class WebhookPayload
@@ -16,19 +17,20 @@ class WebhookPayload
         $data = json_decode($rawPayload, true);
 
         if (json_last_error() !== JSON_ERROR_NONE) {
-            throw new RuntimeException('Payload webhook tidak valid');
+            throw new RuntimeException('Invalid webhook payload');
         }
 
         $this->payload = $data;
-        $this->entry   = $data['entry'][0] ?? [];
-        $this->change  = $this->entry['changes'][0] ?? [];
-        $this->value   = $this->change['value'] ?? [];
+        $this->entry   = Arr::get($data, 'entry.0', []);
+        $this->change  = Arr::get($this->entry, 'changes.0', []);
+        $this->value   = Arr::get($this->change, 'value', []);
     }
 
-    /** ID WhatsApp Business Account */
-    public function wabaId(): ?string
+    /* ================= BASIC ================= */
+
+    public function raw(): array
     {
-        return $this->entry['id'] ?? null;
+        return $this->payload;
     }
 
     public function field(): ?string
@@ -36,66 +38,142 @@ class WebhookPayload
         return $this->change['field'] ?? null;
     }
 
-    public function eventId(): ?string
+    public function wabaId(): ?string
     {
-        if ($this->isIncomingMessage()) {
-            return $this->value['messages'][0]['id'] ?? null;
-        }
-
-        if ($this->isStatus()) {
-            return $this->value['statuses'][0]['id'] ?? null;
-        }
-
-        return sha1($this->field() . ':' . $this->wabaId() . ':' . ($this->accountEvent() ?? ''));
+        return $this->entry['id'] ?? null;
     }
 
     public function phoneNumberId(): ?string
     {
-        return $this->value['metadata']['phone_number_id'] ?? null;
+        return Arr::get($this->value, 'metadata.phone_number_id');
     }
 
     public function displayPhoneNumber(): ?string
     {
-        return $this->value['metadata']['display_phone_number'] ?? null;
+        return Arr::get($this->value, 'metadata.display_phone_number');
     }
 
-    /* -----------------------------------------------------------------
-     | Raw payload accessors
-     |----------------------------------------------------------------- */
+    /* ================= EVENT TYPE ================= */
 
-    public function raw(): array
+    public function type(): string
     {
-        return $this->payload;
+        return match (true) {
+            $this->isIncomingMessage() => 'message',
+            $this->isStatus()          => 'status',
+            $this->isTemplateEvent()   => 'template',
+            $this->isAccountEvent()    => 'account',
+            $this->isPhoneEvent()      => 'phone',
+            default                   => 'unknown',
+        };
     }
 
-    public function entry(): array
+    public function eventId(): string
     {
-        return $this->entry;
+        return $this->messageId()
+            ?? $this->statusId()
+            ?? sha1(json_encode($this->payload));
     }
 
-    public function change(): array
-    {
-        return $this->change;
-    }
-
-    public function value(): array
-    {
-        return $this->value;
-    }
-
-    /* -----------------------------------------------------------------
-     | Event
-     |----------------------------------------------------------------- */
+    /* ================= MESSAGE ================= */
 
     public function isIncomingMessage(): bool
     {
-        return isset($this->value['messages']) && is_array($this->value['messages']);
+        return !empty($this->value['messages']);
     }
+
+    public function messages(): array
+    {
+        return $this->value['messages'] ?? [];
+    }
+
+    public function message(): ?array
+    {
+        return $this->messages()[0] ?? null;
+    }
+
+    public function messageId(): ?string
+    {
+        return Arr::get($this->message(), 'id');
+    }
+
+    public function messageFrom(): ?string
+    {
+        return Arr::get($this->message(), 'from');
+    }
+
+    public function messageType(): ?string
+    {
+        return Arr::get($this->message(), 'type');
+    }
+
+    public function messageText(): ?string
+    {
+        return Arr::get($this->message(), 'text.body');
+    }
+
+    public function messageMediaId(): ?string
+    {
+        return Arr::get($this->message(), 'image.id')
+            ?? Arr::get($this->message(), 'video.id')
+            ?? Arr::get($this->message(), 'audio.id')
+            ?? Arr::get($this->message(), 'document.id');
+    }
+
+    public function messageTimestamp(): ?string
+    {
+        return Arr::get($this->message(), 'timestamp');
+    }
+
+    /* ================= STATUS ================= */
 
     public function isStatus(): bool
     {
-        return isset($this->value['statuses']) && is_array($this->value['statuses']);
+        return !empty($this->value['statuses']);
     }
+
+    public function statuses(): array
+    {
+        return $this->value['statuses'] ?? [];
+    }
+
+    public function status(): ?array
+    {
+        return $this->statuses()[0] ?? null;
+    }
+
+    public function statusId(): ?string
+    {
+        return Arr::get($this->status(), 'id');
+    }
+
+    public function statusValue(): ?string
+    {
+        return Arr::get($this->status(), 'status'); // sent, delivered, read
+    }
+
+    public function statusRecipient(): ?string
+    {
+        return Arr::get($this->status(), 'recipient_id');
+    }
+
+    /* ================= CONTACT ================= */
+
+    public function contact(): ?array
+    {
+        return Arr::get($this->value, 'contacts.0');
+    }
+
+    public function contactName(): ?string
+    {
+        return Arr::get($this->contact(), 'profile.name');
+    }
+
+    public function waId(): ?string
+    {
+        return Arr::get($this->contact(), 'wa_id');
+    }
+
+    /* ================= SYSTEM EVENTS ================= */
 
     public function isTemplateEvent(): bool
     {
@@ -119,143 +197,18 @@ class WebhookPayload
         ], true);
     }
 
-    public function isSystemEvent(): bool
-    {
-        return $this->isAccountEvent()
-            || $this->isPhoneEvent()
-            || $this->isTemplateEvent();
-    }
-
-    /* -----------------------------------------------------------------
-     | Message helpers
-     |----------------------------------------------------------------- */
-
-    public function messages(): array
-    {
-        return $this->value['messages'] ?? [];
-    }
-
-    public function message(): ?array
-    {
-        return $this->isIncomingMessage()
-            ? ($this->messages()[0] ?? null)
-            : null;
-    }
-
-    public function messageFrom(): ?string
-    {
-        return $this->message()['from'] ?? null;
-    }
-
-    public function messageType(): ?string
-    {
-        return $this->message()['type'] ?? null;
-    }
-
-    public function messageText(): ?string
-    {
-        return $this->message()['text']['body'] ?? null;
-    }
-
-    public function hasTextMessage(): bool
-    {
-        return $this->messageType() === 'text'
-            && !empty($this->messageText());
-    }
-
-    public function messageMediaId(): ?string
-    {
-        if (!$this->isIncomingMessage()) {
-            return null;
-        }
-
-        return $this->message()['image']['id']
-            ?? $this->message()['video']['id']
-            ?? $this->message()['audio']['id']
-            ?? null;
-    }
-
-    public function messageTimestamp(): ?string
-    {
-        return $this->message()['timestamp'] ?? null;
-    }
-
-    /* -----------------------------------------------------------------
-     | Status helpers
-     |----------------------------------------------------------------- */
-
-    public function statuses(): array
-    {
-        return $this->value['statuses'] ?? [];
-    }
-
-    /* -----------------------------------------------------------------
-     | Template helpers
-     |----------------------------------------------------------------- */
-
-    public function templateName(): ?string
-    {
-        return $this->value['message_template_name'] ?? null;
-    }
-
-    public function templateLanguage(): ?string
-    {
-        return $this->value['message_template_language'] ?? null;
-    }
-
-    public function templateStatus(): ?string
-    {
-        return $this->value['event'] ?? null;
-    }
-
-    public function templateQuality(): ?string
-    {
-        return $this->value['quality_score'] ?? null;
-    }
-
-    /* -----------------------------------------------------------------
-     | Account & phone helpers
-     |----------------------------------------------------------------- */
-
-    public function accountEvent(): ?string
-    {
-        return $this->value['event'] ?? null;
-    }
-
-    public function accountStatus(): ?string
-    {
-        return $this->value['account_status'] ?? null;
-    }
-
-    public function wabaInfo(): array
-    {
-        return $this->value['waba_info'] ?? [];
-    }
-
-    public function ownerBusinessId(): ?string
-    {
-        return $this->value['waba_info']['owner_business_id'] ?? null;
-    }
-
-    public function phoneQuality(): ?string
-    {
-        return $this->value['quality_rating'] ?? null;
-    }
-
-    public function verifiedName(): ?string
-    {
-        return $this->value['verified_name'] ?? null;
-    }
+    /* ================= SUMMARY ================= */
 
     public function summary(): array
     {
         return [
-            'field'           => $this->field(),
+            'type'            => $this->type(),
             'event_id'        => $this->eventId(),
             'waba_id'         => $this->wabaId(),
             'phone_number_id' => $this->phoneNumberId(),
             'from'            => $this->messageFrom(),
             'message_type'    => $this->messageType(),
+            'status'          => $this->statusValue(),
         ];
     }
 }

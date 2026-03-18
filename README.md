@@ -1,20 +1,23 @@
 # Sejator WABA SDK (Laravel)
 
-Laravel-native SDK for **WhatsApp Cloud API (WABA)**.
+Laravel-native SDK untuk **WhatsApp Cloud API (WABA)**.
 
-SDK ini dirancang khusus untuk Laravel dan mendukung:
+SDK ini dirancang untuk kebutuhan **production & SaaS (Omnichannel / BSP)** dengan fitur lengkap:
 
-- WhatsApp Cloud API
+- WhatsApp Cloud API (Messaging, Media, Template)
 - Embedded Signup (OAuth & Embedded Flow)
-- Messaging, Media, Template, Phone Number
-- Webhook verification & parsing
+- System User & BSP Management
+- Credit Line (Billing)
+- Webhook Verification & Parsing
+- Multi-tenant ready
+- Retry, timeout & logging (production-grade)
 
 ---
 
 ## Requirements
 
-- PHP >= 8.1
-- Laravel 10.x / 11.x
+- PHP >= 8.2
+- Laravel 12.x
 - Meta (Facebook) Developer Account
 
 ---
@@ -22,6 +25,8 @@ SDK ini dirancang khusus untuk Laravel dan mendukung:
 ## Installation
 
 ### Local Development (Path Repository)
+
+1. Tambahkan repository path di composer.json
 
 ```json
 {
@@ -41,13 +46,17 @@ SDK ini dirancang khusus untuk Laravel dan mendukung:
 composer update sejator/waba-sdk
 ```
 
----
+2. Install package
+
+```bash
+composer require sejator/waba-sdk:*
+```
 
 ## Service Provider & Facade
 
-Package ini menggunakan Laravel auto-discovery.
+Auto-discovery aktif secara default.
 
-Facade tersedia sebagai:
+Facade:
 
 ```php
 use Waba;
@@ -59,13 +68,9 @@ Alias:
 Sejator\WabaSdk\Facades\Waba
 ```
 
----
-
 ## Configuration
 
-Package ini sudah menyediakan file konfigurasi bawaan.
-
-### Publish Config
+Publish Config
 
 ```bash
 php artisan vendor:publish \
@@ -73,24 +78,18 @@ php artisan vendor:publish \
   --tag=waba-config
 ```
 
-Setelah publish, file berikut akan tersedia:
+File config:
 
-```text
+```
 config/waba.php
 ```
-
----
 
 ## Environment Variables (.env)
 
 ```env
-# Meta / Facebook App
+# Meta App
 META_APP_ID=
 META_APP_SECRET=
-
-# System User (Admin / BSP)
-META_SYSTEM_USER_ID=
-META_SYSTEM_USER_TOKEN=
 
 # Graph API
 META_GRAPH_URL=https://graph.facebook.com
@@ -100,42 +99,63 @@ META_GRAPH_VERSION=v24.0
 META_OAUTH_BASE_URL=https://www.facebook.com
 META_OAUTH_VERSION=v24.0
 META_OAUTH_REDIRECT_URI=https://your-domain.com/waba/callback
-META_EMBEDDED_CONFIG_ID=
 
 # Webhook
-META_WEBHOOK_URL=https://your-domain.com/api/waba
 META_WEBHOOK_VERIFY_TOKEN=
 
-# Application Mode
-META_APP_MODE=production
-```
+# Default Token (optional)
+WABA_TOKEN=
 
----
+# HTTP Config
+WABA_HTTP_TIMEOUT=10
+WABA_HTTP_RETRY=3
+```
 
 ## Basic Usage
 
-### Set Access Token
+Set Access Token (Multi-tenant)
 
 ```php
-$waba = Waba::withAccessToken($accessToken);
+$waba = Waba::withAccessToken($token);
 ```
-
----
 
 ## Messaging API
 
-### Send Text Message
+- Send Text
 
 ```php
 Waba::withAccessToken($token)
     ->messages($phoneNumberId)
-    ->sendText(
-        to: '628xxxxxxxxx',
-        text: 'Hello from Sejator WABA SDK'
-    );
+    ->text('628xxxx', 'Hello world');
 ```
 
----
+- Send Image
+
+```php
+->image($to, $url, $caption);
+```
+
+- Send Template
+
+```php
+->template($to, 'hello_world', 'id', $components);
+```
+
+- Mark as Read
+
+```php
+->markAsRead($messageId);
+```
+
+## Media API
+
+- Upload
+
+```php
+Waba::withAccessToken($token)
+    ->media()
+    ->upload(storage_path('app/image.jpg'), 'image/jpeg');
+```
 
 ## Template API
 
@@ -145,67 +165,87 @@ Waba::withAccessToken($token)
     ->list();
 ```
 
----
-
-## Media API
-
-### Upload Media
+## Billing (Credit Line)
 
 ```php
 Waba::withAccessToken($token)
-    ->media()
-    ->upload(
-        filePath: storage_path('app/image.jpg'),
-        mimeType: 'image/jpeg'
-    );
+    ->credit()
+    ->listCreditLines($businessId);
 ```
-
----
 
 ## Embedded Signup
 
-### Build Embedded Signup URL
+- Generate URL
 
 ```php
 $url = Waba::embeddedSignup()
-    ->withRedirectUri(route('waba.callback'))
+    ->clientId()
+    ->redirectUri(route('waba.callback'))
+    ->state(csrf_token())
     ->build();
 ```
 
-### Exchange Embedded Code
+- Exchange Code
 
 ```php
-$response = Waba::exchangeEmbeddedCode($code);
+$data = Waba::exchangeEmbeddedCode($code);
 ```
 
----
+## BSP / Admin Flow
+
+- Create System User
+
+```php
+$userId = Waba::admin()
+    ->createSystemUser($businessId);
+```
+
+- Assign WABA
+
+```php
+Waba::admin()->assignWabaAsset($userId, $wabaId);
+```
+
+- Generate Token
+
+```php
+$token = Waba::admin()->generateToken($userId);
+```
+
+## Embedded User Flow
+
+```php
+Waba::withAccessToken($token)
+    ->embedded()
+    ->subscribeAppToWaba($wabaId);
+```
 
 ## Webhook
 
-### Verify Signature
+- Verify Signature
 
 ```php
-$isValid = Waba::verifyWebhookSignature(
+Waba::verifyWebhookSignature(
     $request->getContent(),
     config('waba.meta.app_secret'),
     $request->header('X-Hub-Signature-256')
 );
 ```
 
-### Parse Payload
+- Parse Payload
 
 ```php
 $payload = Waba::parseWebhook($request->getContent());
-```
 
----
+$type = $payload->type(); // message | status | template
+```
 
 ## Error Handling
 
 ```php
 try {
     // call SDK
-} catch (Throwable $e) {
+} catch (\Sejator\WabaSdk\Exceptions\WabaException $e) {
     report($e);
 }
 ```

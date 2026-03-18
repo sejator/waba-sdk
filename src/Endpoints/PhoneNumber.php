@@ -2,6 +2,7 @@
 
 namespace Sejator\WabaSdk\Endpoints;
 
+use InvalidArgumentException;
 use Sejator\WabaSdk\Http\WabaClient;
 
 class PhoneNumber
@@ -15,6 +16,10 @@ class PhoneNumber
      */
     public function list(string $wabaId): array
     {
+        if (empty($wabaId)) {
+            throw new InvalidArgumentException('wabaId is required');
+        }
+
         return $this->client->get("{$wabaId}/phone_numbers");
     }
 
