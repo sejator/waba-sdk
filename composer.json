@@ -1,40 +1,43 @@
 {
-  "name": "sejator/waba-sdk",
-  "description": "Laravel SDK for WhatsApp Cloud API (WABA)",
-  "type": "library",
-  "license": "MIT",
-  "authors": [
-    {
-      "name": "Sejator Dev",
-      "email": "sejatordev@gmail.com"
-    }
-  ],
-  "keywords": [
-    "laravel",
-    "whatsapp",
-    "waba",
-    "sdk"
-  ],
-  "homepage": "https://github.com/sejator/waba-sdk",
-  "require": {
-    "php": ">=8.2",
-    "illuminate/support": "^12.0"
-  },
-  "autoload": {
-    "psr-4": {
-      "Sejator\\WabaSdk\\": "src/"
-    }
-  },
-  "extra": {
-    "laravel": {
-      "providers": [
-        "Sejator\\WabaSdk\\WabaServiceProvider"
-      ],
-      "aliases": {
-        "Waba": "Sejator\\WabaSdk\\Facades\\Waba"
-      }
-    }
-  },
-  "minimum-stability": "stable",
-  "prefer-stable": true
+    "name": "sejator/waba-sdk",
+    "description": "Laravel SDK for WhatsApp Cloud API (WABA)",
+    "type": "library",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Sejator Dev",
+            "email": "sejatordev@gmail.com"
+        }
+    ],
+    "keywords": [
+        "laravel",
+        "whatsapp",
+        "waba",
+        "sdk"
+    ],
+    "homepage": "https://github.com/sejator/waba-sdk",
+    "require": {
+        "php": "^8.2",
+        "illuminate/support": "^12.0",
+        "illuminate/http": "^12.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Sejator\\WabaSdk\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Sejator\\WabaSdk\\Tests\\": "tests/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Sejator\\WabaSdk\\WabaServiceProvider"
+            ]
+        }
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true
 }
