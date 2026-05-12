@@ -112,6 +112,10 @@ class Client
             ->map(fn($v, $k) => strtoupper($k) . ": " . $v)
             ->implode(" | ");
 
-        throw new WabaException($fullMessage ?: $res->body());
+        throw new WabaException(
+            $fullMessage ?: $res->body(),
+            $res->status(),
+            $json
+        );
     }
 }
