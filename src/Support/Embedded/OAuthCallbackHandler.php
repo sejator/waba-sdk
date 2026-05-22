@@ -140,12 +140,11 @@ class OAuthCallbackHandler
         ]);
     }
 
-    public function createSession(array $context = []): EmbeddedSignupSession
+    public function createSession(array $attributes = []): EmbeddedSignupSession
     {
-
         $session = EmbeddedSignupSession::make([
             'state' => Str::uuid()->toString(),
-            'context' => $context,
+            ...$attributes,
         ]);
 
         $this->stateManager->put(

@@ -1,76 +1,81 @@
 # Sejator WABA SDK (Laravel)
 
-Laravel-native SDK untuk **WhatsApp Cloud API (WABA)**.
+Laravel-native SDK untuk membangun integrasi **WhatsApp Cloud API (WABA)** secara modern, scalable, dan production-ready.
 
-SDK ini dirancang untuk kebutuhan **production & SaaS (Omnichannel / BSP)** dengan fitur lengkap:
+SDK ini dirancang untuk:
 
-- WhatsApp Cloud API (Messaging, Media, Template)
-- Embedded Signup (OAuth & Embedded Flow)
-- System User & BSP Management
-- Credit Line (Billing)
-- Webhook Verification & Parsing
-- Multi-tenant ready
-- Retry, timeout & logging (production-grade)
+- SaaS Omnichannel
+- WhatsApp BSP Platform
+- CRM & Customer Support
+- Multi-device WhatsApp Management
+- Embedded Signup Flow
+- Multi-tenant Architecture
 
 ---
 
-## Requirements
+## Features
+
+### WhatsApp Cloud API
+
+- Send text message
+- Send image, video, document, audio
+- Interactive button & list
+- Template message
+- Mark as read
+- Media upload & download
+
+### Embedded Signup
+
+- Official Meta Embedded Signup
+- OAuth Popup Flow
+- Token Exchange
+- Embedded Session State Manager
+- Webhook Subscription
+
+### Webhook System
+
+- Signature verification
+- Webhook parser
+- Incoming message normalizer
+- Message type resolver
+
+### Business Management
+
+- Business account information
+- WABA management
+- Phone number management
+
+### Production Ready
+
+- Retry support
+- Timeout handling
+- Structured exceptions
+- DTO-based architecture
+- Enum support
+- Multi-tenant ready
+
+---
+
+# Requirements
 
 - PHP >= 8.2
-- Laravel 12.x
-- Meta (Facebook) Developer Account
+- Laravel >= 12
+- Meta Developer Account
+- WhatsApp Business Platform Access
 
 ---
 
-## Installation
+# Installation
 
-### Local Development (Path Repository)
-
-1. Tambahkan repository path di composer.json
-
-```json
-{
-  "repositories": [
-    {
-      "type": "path",
-      "url": "../waba-sdk"
-    }
-  ],
-  "require": {
-    "sejator/waba-sdk": "*"
-  }
-}
-```
+## Composer
 
 ```bash
-composer update sejator/waba-sdk
+composer require sejator/waba-sdk
 ```
 
-2. Install package
+---
 
-```bash
-composer require sejator/waba-sdk:*
-```
-
-## Service Provider & Facade
-
-Auto-discovery aktif secara default.
-
-Facade:
-
-```php
-use Waba;
-```
-
-Alias:
-
-```php
-Sejator\WabaSdk\Facades\Waba
-```
-
-## Configuration
-
-Publish Config
+# Publish Configuration
 
 ```bash
 php artisan vendor:publish \
@@ -80,172 +85,417 @@ php artisan vendor:publish \
 
 File config:
 
-```
+```txt
 config/waba.php
 ```
 
-## Environment Variables (.env)
+---
+
+# Environment Variables
 
 ```env
-# Meta App
+/*
+|--------------------------------------------------------------------------
+| Meta App
+|--------------------------------------------------------------------------
+*/
+
 META_APP_ID=
 META_APP_SECRET=
 
-# Graph API
-META_GRAPH_URL=https://graph.facebook.com
-META_GRAPH_VERSION=v24.0
+/*
+|--------------------------------------------------------------------------
+| Graph API
+|--------------------------------------------------------------------------
+*/
 
-# OAuth / Embedded Signup
-META_OAUTH_BASE_URL=https://www.facebook.com
-META_OAUTH_VERSION=v24.0
-META_OAUTH_REDIRECT_URI=https://your-domain.com/waba/callback
+META_BASE_URL=https://graph.facebook.com/v23.0
 
-# Webhook
-META_WEBHOOK_VERIFY_TOKEN=
+/*
+|--------------------------------------------------------------------------
+| Default Access Token
+|--------------------------------------------------------------------------
+|
+| Optional.
+|
+*/
 
-# Default Token (optional)
-WABA_TOKEN=
+META_ACCESS_TOKEN=
 
-# HTTP Config
-WABA_HTTP_TIMEOUT=10
-WABA_HTTP_RETRY=3
+/*
+|--------------------------------------------------------------------------
+| Embedded Signup
+|--------------------------------------------------------------------------
+*/
+
+META_CONFIGURATION_ID=
+
+META_REDIRECT_URI=https://your-domain.com/embedded/callback
+
+META_OAUTH_VERSION=v23.0
+
+/*
+|--------------------------------------------------------------------------
+| Webhook
+|--------------------------------------------------------------------------
+*/
+
+META_VERIFY_TOKEN=
 ```
 
-## Basic Usage
+---
 
-Set Access Token (Multi-tenant)
+# Package Structure
 
-```php
-$waba = Waba::withAccessToken($token);
+```txt
+src
+├── Contracts
+├── DTO
+├── Enums
+├── Exceptions
+├── Facades
+├── Services
+├── Support
+│   ├── Embedded
+│   └── Webhooks
+├── Traits
+├── Utils
+└── WabaServiceProvider
 ```
 
-## Messaging API
+---
 
-- Send Text
+# Basic Usage
+
+## Import Facade
 
 ```php
-Waba::withAccessToken($token)
-    ->messages($phoneNumberId)
-    ->text('628xxxx', 'Hello world');
+use Waba;
 ```
 
-- Send Image
+atau:
 
 ```php
-->image($to, $url, $caption);
+use Sejator\WabaSdk\Facades\Waba;
 ```
 
-- Send Template
+---
+
+# Messaging API
+
+## Send Text Message
 
 ```php
-->template($to, 'hello_world', 'id', $components);
+Waba::messages()
+    ->text(
+        to: '628xxxx',
+        body: 'Hello World'
+    );
 ```
 
-- Mark as Read
+---
+
+## Send Image
 
 ```php
-->markAsRead($messageId);
+Waba::messages()
+    ->image(
+        to: '628xxxx',
+        image: 'https://example.com/image.jpg',
+        caption: 'Image Caption'
+    );
 ```
 
-## Media API
+---
 
-- Upload
+## Send Template
 
 ```php
-Waba::withAccessToken($token)
-    ->media()
-    ->upload(storage_path('app/image.jpg'), 'image/jpeg');
+Waba::messages()
+    ->template(
+        to: '628xxxx',
+        name: 'hello_world',
+        language: 'id'
+    );
 ```
 
-## Template API
+---
+
+# Media API
+
+## Upload Media
 
 ```php
-Waba::withAccessToken($token)
-    ->templates($wabaId)
-    ->list();
+Waba::media()
+    ->upload(
+        path: storage_path('app/image.jpg'),
+        mime: 'image/jpeg'
+    );
 ```
 
-## Billing (Credit Line)
+---
+
+## Download Media
 
 ```php
-Waba::withAccessToken($token)
-    ->credit()
-    ->listCreditLines($businessId);
+Waba::media()
+    ->download($mediaId);
 ```
 
-## Embedded Signup
+---
 
-- Generate URL
+# Template API
+
+## Get Templates
 
 ```php
-$url = Waba::embeddedSignup()
-    ->clientId()
-    ->redirectUri(route('waba.callback'))
-    ->state(csrf_token())
-    ->build();
+Waba::templates($wabaId)
+    ->all();
 ```
 
-- Exchange Code
+---
+
+## Create Template
 
 ```php
-$data = Waba::exchangeEmbeddedCode($code);
+Waba::templates($wabaId)
+    ->create([
+        'name' => 'promo_template',
+        'language' => 'id',
+        'category' => 'MARKETING',
+        'components' => [
+            ...
+        ]
+    ]);
 ```
 
-## BSP / Admin Flow
+---
 
-- Create System User
+# Business API
+
+## Get Business Profile
 
 ```php
-$userId = Waba::admin()
-    ->createSystemUser($businessId);
+Waba::business()
+    ->me();
 ```
 
-- Assign WABA
+---
+
+# Phone Number API
+
+## Get Phone Numbers
 
 ```php
-Waba::admin()->assignWabaAsset($userId, $wabaId);
+Waba::phoneNumbers()
+    ->all($wabaId);
 ```
 
-- Generate Token
+---
+
+# Embedded Signup
+
+SDK mendukung official Meta Embedded Signup popup flow.
+
+---
+
+## Generate Embedded Signup URL
 
 ```php
-$token = Waba::admin()->generateToken($userId);
+use Sejator\WabaSdk\Services\EmbeddedSignupService;
+use Sejator\WabaSdk\Support\Embedded\OAuthCallbackHandler;
+
+$handler = app(
+    OAuthCallbackHandler::class
+);
+
+$session = $handler->createSession([
+
+    'context' => [
+
+        'tenant_id' => tenant()->id,
+
+        'user_id' => auth()->id(),
+
+        'redirect' => route('devices.index'),
+
+    ],
+
+]);
+
+$embedded = app(
+    EmbeddedSignupService::class
+);
+
+$signup = $embedded->signupUrl(
+    $session->state
+);
+
+$url = $signup['url'];
 ```
 
-## Embedded User Flow
+---
 
-```php
-Waba::withAccessToken($token)
-    ->embedded()
-    ->subscribeAppToWaba($wabaId);
+## Open Popup
+
+```js
+window.open(url, "metaEmbeddedSignup", "width=560,height=820");
 ```
 
-## Webhook
+---
 
-- Verify Signature
+# OAuth Callback
+
+## Route
 
 ```php
-Waba::verifyWebhookSignature(
-    $request->getContent(),
-    config('waba.meta.app_secret'),
-    $request->header('X-Hub-Signature-256')
+Route::get(
+    '/embedded/callback',
+    EmbeddedSignupCallbackController::class
+)->name('embedded.callback');
+```
+
+---
+
+## Controller Example
+
+```php
+$session = $handler->state(
+    request('state')
+);
+
+$tenantId = data_get(
+    $session->context,
+    'tenant_id'
+);
+
+$userId = data_get(
+    $session->context,
+    'user_id'
+);
+
+$result = $handler->handle(
+    code: request('code'),
+    state: request('state')
 );
 ```
 
-- Parse Payload
+---
+
+# Webhook Verification
+
+## Verify Webhook
 
 ```php
-$payload = Waba::parseWebhook($request->getContent());
+use Sejator\WabaSdk\Support\Webhooks\WebhookVerifier;
 
-$type = $payload->type(); // message | status | template
+$verifier = app(
+    WebhookVerifier::class
+);
+
+$challenge = $verifier->verify(
+    request('hub_mode'),
+    request('hub_verify_token'),
+    request('hub_challenge'),
+);
 ```
 
-## Error Handling
+---
+
+# Webhook Signature Validation
 
 ```php
+use Sejator\WabaSdk\Support\Webhooks\WebhookSignatureValidator;
+
+$validator = app(
+    WebhookSignatureValidator::class
+);
+
+$isValid = $validator->validate(
+    request()
+);
+```
+
+---
+
+# Parse Incoming Messages
+
+```php
+use Sejator\WabaSdk\Support\Webhooks\WebhookParser;
+
+$parser = app(
+    WebhookParser::class
+);
+
+$messages = $parser->parse(
+    request()->all()
+);
+```
+
+---
+
+# Error Handling
+
+```php
+use Sejator\WabaSdk\Exceptions\WabaException;
+
 try {
-    // call SDK
-} catch (\Sejator\WabaSdk\Exceptions\WabaException $e) {
+
+    // SDK call
+
+} catch (WabaException $e) {
+
     report($e);
+
 }
 ```
+
+---
+
+# Architecture
+
+```txt
+Controller
+│
+├── Services
+│   ├── MessageService
+│   ├── TemplateService
+│   ├── MediaService
+│   ├── EmbeddedSignupService
+│   ├── BusinessService
+│   └── PhoneNumberService
+│
+├── Support
+│   ├── Embedded
+│   ├── Webhooks
+│   └── Normalizers
+│
+├── DTO
+│
+└── Client
+    └── Meta Graph API
+```
+
+---
+
+# Production Notes
+
+## Embedded Signup Callback
+
+Disarankan callback route:
+
+- tidak memakai middleware auth,
+- tidak bergantung session Laravel,
+- menggunakan OAuth state context.
+
+---
+
+## Multi Tenant
+
+SDK mendukung multi-tenant architecture melalui:
+
+```php
+context => []
+```
+
+pada `EmbeddedSignupSession`.
