@@ -82,6 +82,21 @@ class Client
         throw new WabaException('Failed to download media');
     }
 
+    public function setToken(string $token): static
+    {
+        $this->token = $token;
+
+        return $this;
+    }
+
+    public function withToken(string $token): static
+    {
+        return new static(
+            $this->baseUrl,
+            $token
+        );
+    }
+
     protected function http()
     {
         return Http::withToken($this->token);
