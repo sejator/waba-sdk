@@ -15,18 +15,27 @@ class EmbeddedSignupService
         protected WebhookSubscriber $subscriber,
     ) {}
 
-    public function signupUrl(): array
-    {
-        return $this->urlGenerator->generate();
+    public function signupUrl(
+        ?string $state = null
+    ): array {
+
+        return $this->urlGenerator
+            ->generate($state);
     }
 
-    public function exchangeCode(string $code): array
-    {
-        return $this->tokenExchanger->exchange($code);
+    public function exchangeCode(
+        string $code
+    ): array {
+
+        return $this->tokenExchanger
+            ->exchange($code);
     }
 
-    public function subscribeWebhook(string $wabaId): array
-    {
-        return $this->subscriber->subscribe($wabaId);
+    public function subscribeWebhook(
+        string $wabaId
+    ): array {
+
+        return $this->subscriber
+            ->subscribe($wabaId);
     }
 }

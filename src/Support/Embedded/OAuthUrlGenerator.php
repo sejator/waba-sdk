@@ -6,40 +6,94 @@ use Illuminate\Support\Str;
 
 class OAuthUrlGenerator
 {
-    public function generate(): array
+    public function generate(?string $state = null): array
     {
+
         $this->ensureConfigured();
 
-        $state = Str::uuid()->toString();
+        /*
+        |--------------------------------------------------------------------------
+        | OAuth State
+        |--------------------------------------------------------------------------
+        */
+
+        $state ??= Str::uuid()->toString();
+
+        /*
+        |--------------------------------------------------------------------------
+        | Embedded Extras
+        |--------------------------------------------------------------------------
+        */
 
         $extras = [
             'sessionInfoVersion' => '3',
             'version' => 'v4',
         ];
 
+        /*
+        |--------------------------------------------------------------------------
+        | Redirect URI
+        |--------------------------------------------------------------------------
+        */
+
         $redirect = config(
             'waba.embedded.redirect_uri'
         );
 
+        /*
+        |--------------------------------------------------------------------------
+        | Query
+        |--------------------------------------------------------------------------
+        */
+
         $query = http_build_query([
             'display' => 'popup',
+
             'client_id' => config(
                 'waba.meta.app_id'
             ),
+
             'redirect_uri' => $redirect,
+
             'fallback_redirect_uri' => $redirect,
+
             'config_id' => config(
                 'waba.embedded.config_id'
             ),
+
             'response_type' => 'code',
+
             'override_default_response_type' => true,
+
             'state' => $state,
-            'extras' => json_encode($extras),
+
+            /*
+            |--------------------------------------------------------------------------
+            | Embedded Extras
+            |--------------------------------------------------------------------------
+            */
+
+            'extras' => json_encode(
+                $extras
+            ),
         ]);
+
+        /*
+        |--------------------------------------------------------------------------
+        | OAuth Version
+        |--------------------------------------------------------------------------
+        */
+
         $version = config(
             'waba.embedded.oauth_version',
             'v23.0'
         );
+
+        /*
+        |--------------------------------------------------------------------------
+        | Final URL
+        |--------------------------------------------------------------------------
+        */
 
         return [
             'state' => $state,

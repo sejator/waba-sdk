@@ -11,24 +11,20 @@ class EmbeddedStateManager
 
     protected int $ttl = 300;
 
-    public function put(
-        EmbeddedSignupSession $session
-    ): void {
+    public function put(EmbeddedSignupSession $session): void
+    {
 
         Cache::put(
-
             $this->key($session->state),
-
             $session->toArray(),
-
-            now()->addSeconds($this->ttl)
-
+            now()->addSeconds(
+                $this->ttl
+            )
         );
     }
 
-    public function get(
-        string $state
-    ): ?EmbeddedSignupSession {
+    public function get(string $state): ?EmbeddedSignupSession
+    {
 
         $payload = Cache::get(
             $this->key($state)
@@ -38,48 +34,16 @@ class EmbeddedStateManager
             return null;
         }
 
-        return new EmbeddedSignupSession(
+        /*
+        |--------------------------------------------------------------------------
+        | Restore DTO
+        |--------------------------------------------------------------------------
+        */
 
-            state: data_get($payload, 'state'),
-
-            status: data_get(
-                $payload,
-                'status',
-                'pending'
-            ),
-
-            code: data_get($payload, 'code'),
-
-            businessId: data_get(
-                $payload,
-                'business_id'
-            ),
-
-            wabaId: data_get(
-                $payload,
-                'waba_id'
-            ),
-
-            phoneNumberId: data_get(
-                $payload,
-                'phone_number_id'
-            ),
-
-            accessToken: data_get(
-                $payload,
-                'access_token'
-            ),
-
-            payload: data_get(
-                $payload,
-                'payload',
-                []
-            ),
-
-            createdAt: data_get(
-                $payload,
-                'created_at'
-            )
+        return EmbeddedSignupSession::make([
+            ...$payload,
+            'created_at' =>
+            data_get($payload, 'created_at')
                 ? now()->parse(
                     data_get(
                         $payload,
@@ -88,10 +52,8 @@ class EmbeddedStateManager
                 )
                 : null,
 
-            completedAt: data_get(
-                $payload,
-                'completed_at'
-            )
+            'completed_at' =>
+            data_get($payload, 'completed_at')
                 ? now()->parse(
                     data_get(
                         $payload,
@@ -100,7 +62,7 @@ class EmbeddedStateManager
                 )
                 : null,
 
-        );
+        ]);
     }
 
     public function forget(string $state): void
@@ -115,6 +77,16 @@ class EmbeddedStateManager
         return Cache::has(
             $this->key($state)
         );
+    }
+
+    public function pull(string $state): ?EmbeddedSignupSession
+    {
+
+        $session = $this->get($state);
+
+        $this->forget($state);
+
+        return $session;
     }
 
     protected function key(string $state): string
