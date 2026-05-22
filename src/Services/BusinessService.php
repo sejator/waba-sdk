@@ -8,13 +8,19 @@ class BusinessService
         protected Client $client,
     ) {}
 
-    public function me(): array
+    public function waba(string $wabaId): array
     {
-        return $this->client->get('me');
-    }
 
-    public function wabas(string $businessId): array
-    {
-        return $this->client->get($businessId . '/owned_whatsapp_business_accounts');
+        return $this->client->get(
+            $wabaId,
+            [
+                'fields' => implode(',', [
+                    'id',
+                    'name',
+                    'currency',
+                    'owner_business_info',
+                ]),
+            ]
+        );
     }
 }

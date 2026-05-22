@@ -6,26 +6,46 @@ use Illuminate\Support\Str;
 use Sejator\WabaSdk\DTO\EmbeddedSignupResult;
 use Sejator\WabaSdk\DTO\EmbeddedSignupSession;
 use Sejator\WabaSdk\Exceptions\EmbeddedSignupException;
-use Sejator\WabaSdk\Services\Client;
 
 class OAuthCallbackHandler
 {
     public function __construct(
-        protected Client $client,
         protected TokenExchanger $tokenExchanger,
         protected EmbeddedStateManager $stateManager,
     ) {}
 
-    public function handle(string $code, string $state): EmbeddedSignupResult
-    {
+    /*
+    |--------------------------------------------------------------------------
+    | Handle OAuth Callback
+    |--------------------------------------------------------------------------
+    |
+    | Responsibilities:
+    |
+    | - validate state
+    | - exchange token
+    | - persist session
+    |
+    | NOT:
+    | - fetch WABA
+    | - fetch phones
+    | - subscribe webhook
+    |
+    */
+
+    public function handle(
+        string $code,
+        string $state
+    ): EmbeddedSignupResult {
 
         /*
         |--------------------------------------------------------------------------
-        | Validate Session State
+        | Validate Session
         |--------------------------------------------------------------------------
         */
 
-        $session = $this->state($state);
+        $session = $this->state(
+            $state
+        );
 
         if (!$session) {
 
@@ -57,50 +77,29 @@ class OAuthCallbackHandler
 
         /*
         |--------------------------------------------------------------------------
-        | Graph Client
-        |--------------------------------------------------------------------------
-        */
-
-        $graph = $this->client
-            ->withToken($accessToken);
-
-        /*
-        |--------------------------------------------------------------------------
-        | Business Account
-        |--------------------------------------------------------------------------
-        */
-
-        $me = $graph->get('me', [
-            'fields' => 'id,name',
-        ]);
-
-        /*
-        |--------------------------------------------------------------------------
         | Complete Session
         |--------------------------------------------------------------------------
         */
 
         $completed = $session->completed([
+
             'code' => $code,
-            'access_token' => $accessToken,
-            'business_id' => data_get(
-                $me,
-                'id'
-            ),
-            'business_name' => data_get(
-                $me,
-                'name'
-            ),
+
+            'access_token' =>
+            $accessToken,
+
             'status' => 'completed',
+
             /*
             |--------------------------------------------------------------------------
-            | Original Token Payload
+            | Raw Payload
             |--------------------------------------------------------------------------
             */
 
             'payload' => [
+
                 'token' => $token,
-                'me' => $me,
+
             ],
 
         ]);
@@ -122,29 +121,38 @@ class OAuthCallbackHandler
         */
 
         return EmbeddedSignupResult::fromArray([
-            'access_token' => $accessToken,
-            'business_id' => data_get(
-                $me,
-                'id'
-            ),
-            'business_name' => data_get(
-                $me,
-                'name'
-            ),
+
+            'access_token' =>
+            $accessToken,
+
             'status' => 'completed',
+
             'payload' => [
+
                 'token' => $token,
-                'me' => $me,
+
             ],
 
         ]);
     }
 
-    public function createSession(array $attributes = []): EmbeddedSignupSession
-    {
+    /*
+    |--------------------------------------------------------------------------
+    | Create Session
+    |--------------------------------------------------------------------------
+    */
+
+    public function createSession(
+        array $attributes = []
+    ): EmbeddedSignupSession {
+
         $session = EmbeddedSignupSession::make([
-            'state' => Str::uuid()->toString(),
+
+            'state' =>
+            Str::uuid()->toString(),
+
             ...$attributes,
+
         ]);
 
         $this->stateManager->put(
@@ -154,15 +162,30 @@ class OAuthCallbackHandler
         return $session;
     }
 
-    public function state(string $state): ?EmbeddedSignupSession
-    {
+    /*
+    |--------------------------------------------------------------------------
+    | Get Session
+    |--------------------------------------------------------------------------
+    */
+
+    public function state(
+        string $state
+    ): ?EmbeddedSignupSession {
+
         return $this->stateManager->get(
             $state
         );
     }
 
-    public function forget(string $state): void
-    {
+    /*
+    |--------------------------------------------------------------------------
+    | Forget Session
+    |--------------------------------------------------------------------------
+    */
+
+    public function forget(
+        string $state
+    ): void {
 
         $this->stateManager->forget(
             $state

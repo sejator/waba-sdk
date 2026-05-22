@@ -6,8 +6,9 @@ use Illuminate\Support\Str;
 
 class OAuthUrlGenerator
 {
-    public function generate(?string $state = null): array
-    {
+    public function generate(
+        ?string $state = null
+    ): array {
 
         $this->ensureConfigured();
 
@@ -26,8 +27,11 @@ class OAuthUrlGenerator
         */
 
         $extras = [
+
             'sessionInfoVersion' => '3',
+
             'version' => 'v4',
+
         ];
 
         /*
@@ -42,28 +46,86 @@ class OAuthUrlGenerator
 
         /*
         |--------------------------------------------------------------------------
-        | Query
+        | OAuth Query
         |--------------------------------------------------------------------------
         */
 
         $query = http_build_query([
+
+            /*
+            |--------------------------------------------------------------------------
+            | Display
+            |--------------------------------------------------------------------------
+            */
+
             'display' => 'popup',
+
+            /*
+            |--------------------------------------------------------------------------
+            | App
+            |--------------------------------------------------------------------------
+            */
 
             'client_id' => config(
                 'waba.meta.app_id'
             ),
 
+            /*
+            |--------------------------------------------------------------------------
+            | Redirect
+            |--------------------------------------------------------------------------
+            */
+
             'redirect_uri' => $redirect,
 
             'fallback_redirect_uri' => $redirect,
+
+            /*
+            |--------------------------------------------------------------------------
+            | Embedded Signup Config
+            |--------------------------------------------------------------------------
+            */
 
             'config_id' => config(
                 'waba.embedded.config_id'
             ),
 
+            /*
+            |--------------------------------------------------------------------------
+            | OAuth Response
+            |--------------------------------------------------------------------------
+            */
+
             'response_type' => 'code',
 
-            'override_default_response_type' => true,
+            /*
+            |--------------------------------------------------------------------------
+            | Important
+            |--------------------------------------------------------------------------
+            |
+            | Must be string "true"
+            | not boolean true.
+            |
+            */
+
+            'override_default_response_type' => 'true',
+
+            /*
+            |--------------------------------------------------------------------------
+            | Permissions
+            |--------------------------------------------------------------------------
+            */
+
+            'scope' => implode(',', [
+                'whatsapp_business_management',
+                'whatsapp_business_messaging',
+            ]),
+
+            /*
+            |--------------------------------------------------------------------------
+            | OAuth State
+            |--------------------------------------------------------------------------
+            */
 
             'state' => $state,
 
@@ -76,6 +138,7 @@ class OAuthUrlGenerator
             'extras' => json_encode(
                 $extras
             ),
+
         ]);
 
         /*
@@ -96,14 +159,23 @@ class OAuthUrlGenerator
         */
 
         return [
+
             'state' => $state,
+
             'url' =>
             "https://www.facebook.com/{$version}/dialog/oauth?{$query}",
+
         ];
     }
 
     protected function ensureConfigured(): void
     {
+        /*
+        |--------------------------------------------------------------------------
+        | App ID
+        |--------------------------------------------------------------------------
+        */
+
         if (!config('waba.meta.app_id')) {
 
             throw new \RuntimeException(
@@ -111,12 +183,24 @@ class OAuthUrlGenerator
             );
         }
 
+        /*
+        |--------------------------------------------------------------------------
+        | Embedded Config ID
+        |--------------------------------------------------------------------------
+        */
+
         if (!config('waba.embedded.config_id')) {
 
             throw new \RuntimeException(
                 'META_CONFIGURATION_ID is not configured.'
             );
         }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Redirect URI
+        |--------------------------------------------------------------------------
+        */
 
         if (!config('waba.embedded.redirect_uri')) {
 
