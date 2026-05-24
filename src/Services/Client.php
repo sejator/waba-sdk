@@ -2,43 +2,78 @@
 
 namespace Sejator\WabaSdk\Services;
 
+use Illuminate\Http\Client\PendingRequest;
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
-use Sejator\WabaSdk\Exceptions\WabaException;
+use Sejator\WabaSdk\Exceptions\GraphApiException;
 
 class Client
 {
     public function __construct(
         protected string $baseUrl,
-        protected string $token
+        protected ?string $token = null,
     ) {}
 
-    public function get(string $uri, array $query = [])
+    public function get(string $uri, array $query = []): array
     {
         return $this->handle(
-            $this->http()->get($this->url($uri), $query)
+            $this->http()->get(
+                $this->url($uri),
+                $query
+            )
         );
     }
 
-    public function post(string $uri, array $payload = [])
+    public function post(string $uri, array $payload = []): array
     {
         return $this->handle(
-            $this->http()->post($this->url($uri), $payload)
+            $this->http()->post(
+                $this->url($uri),
+                $payload
+            )
         );
     }
 
-    public function delete(string $uri, array $payload = [])
+    public function delete(string $uri, array $payload = []): array
     {
         return $this->handle(
-            $this->http()->delete($this->url($uri), $payload)
+            $this->http()->delete(
+                $this->url($uri),
+                $payload
+            )
         );
     }
 
-    public function postWithQuery(string $uri, array $query = [])
+    public function patch(string $uri, array $payload = []): array
+    {
+        return $this->handle(
+            $this->http()->patch(
+                $this->url($uri),
+                $payload
+            )
+        );
+    }
+
+    public function put(string $uri, array $payload = []): array
+    {
+        return $this->handle(
+            $this->http()->put(
+                $this->url($uri),
+                $payload
+            )
+        );
+    }
+
+    public function postWithQuery(string $uri, array $query = []): array
     {
         return $this->handle(
             $this->http()
-                ->withOptions(['query' => $query])
-                ->post($this->url($uri))
+                ->withOptions([
+                    'query' => $query,
+                ])
+                ->post(
+                    $this->url($uri)
+                )
         );
     }
 
@@ -50,46 +85,60 @@ class Client
             $http = $http->attach(
                 $part['name'],
                 $part['contents'],
-                $part['filename'] ?? null
+                $part['filename'] ?? null,
+                $part['headers'] ?? []
             );
         }
 
-        return $this->handle($http->post($this->url($uri)));
+        return $this->handle(
+            $http->post(
+                $this->url($uri)
+            )
+        );
     }
 
-    public function uploadBinary(string $uploadId, string $binary)
+    public function uploadBinary(string $uploadId, string $binary, int $offset = 0): array
     {
         return $this->handle(
             $this->http()
                 ->withHeaders([
-                    'file_offset' => 0,
+                    'file_offset' => $offset,
                     'Content-Type' => 'application/octet-stream',
                 ])
-                ->send('POST', $this->url($uploadId), [
-                    'body' => $binary,
-                ])
+                ->send(
+                    'POST',
+                    $this->url($uploadId),
+                    [
+                        'body' => $binary,
+                    ]
+                )
         );
     }
 
-    public function getRaw(string $url)
+    public function getRaw(string $url): string
     {
-        $res = $this->http()->get($url);
+        $response = $this->http()
+            ->get($url);
 
-        if ($res->successful()) {
-            return $res->body();
+        if ($response->successful()) {
+
+            return $response->body();
         }
 
-        throw new WabaException('Failed to download media');
+        throw GraphApiException::fromResponse(
+            $response->json(),
+            $response->status()
+        );
     }
 
-    public function setToken(string $token): static
+    public function setToken(?string $token): static
     {
         $this->token = $token;
 
         return $this;
     }
 
-    public function withToken(string $token): static
+    public function withToken(?string $token): static
     {
         return new static(
             $this->baseUrl,
@@ -97,40 +146,70 @@ class Client
         );
     }
 
-    protected function http()
+    public function system(): static
     {
-        return Http::withToken($this->token);
+        return $this->withToken(
+            config('waba.meta.system_user_token')
+        );
+    }
+
+    protected function http(): PendingRequest
+    {
+        $http = Http::acceptJson()
+            ->withHeaders([
+                'User-Agent' => 'Sejator-WabaSDK/1.0',
+                'X-Request-ID' => (string) str()->uuid(),
+            ])
+            ->timeout(
+                config('waba.http.timeout', 30)
+            )
+            ->connectTimeout(
+                config('waba.http.connect_timeout', 10)
+            )
+            ->retry(
+                config('waba.http.retry.times', 2),
+                config('waba.http.retry.sleep', 500),
+                function ($exception, $request) {
+                    if (!$exception instanceof GraphApiException) {
+                        return true;
+                    }
+
+                    return $exception->isRetryable();
+                }
+            );
+
+        if ($this->token) {
+            $http = $http->withToken(
+                $this->token
+            );
+        }
+
+        return $http;
     }
 
     protected function url(string $uri): string
     {
-        return rtrim($this->baseUrl, '/') . '/' . ltrim($uri, '/');
+        return rtrim(
+            $this->baseUrl,
+            '/'
+        ) . '/' . ltrim(
+            $uri,
+            '/'
+        );
     }
 
-    protected function handle($res)
+    protected function handle(Response $response): array
     {
-        if ($res->successful()) {
-            return $res->json();
+
+        if ($response->successful()) {
+            return $response->json() ?? [];
         }
 
-        $json = $res->json();
+        $json = $response->json();
 
-        $fullMessage = collect([
-            "message"  => data_get($json, 'error.message'),
-            "type"     => data_get($json, 'error.type'),
-            "code"     => data_get($json, 'error.code'),
-            "subcode"  => data_get($json, 'error.error_subcode'),
-            "details"  => data_get($json, 'error.error_data.details'),
-            "user_msg" => data_get($json, 'error.error_user_msg'),
-        ])
-            ->filter()
-            ->map(fn($v, $k) => strtoupper($k) . ": " . $v)
-            ->implode(" | ");
-
-        throw new WabaException(
-            $fullMessage ?: $res->body(),
-            $res->status(),
-            $json
+        throw GraphApiException::fromResponse(
+            $json,
+            $response->status()
         );
     }
 }

@@ -2,77 +2,97 @@
 
 namespace Sejator\WabaSdk\Support\Embedded;
 
-use Illuminate\Support\Facades\Http;
-
 use Sejator\WabaSdk\Exceptions\TokenExchangeException;
+use Sejator\WabaSdk\Services\Client;
 
 class TokenExchanger
 {
-    /*
-    |--------------------------------------------------------------------------
-    | Exchange Authorization Code
-    |--------------------------------------------------------------------------
-    |
-    */
+    public function __construct(
+        protected Client $client,
+    ) {}
 
-    public function exchange(string $code, ?string $redirectUri = null,): array
+    /**
+     * Exchange Authorization Code
+     *
+     * Official Meta OAuth Flow
+     *
+     */
+    public function exchange(string $code, ?string $redirectUri = null): array
     {
-        $grapUrl = config(
-            'waba.meta.base_url',
-            'https://graph.facebook.com/v25.0'
-        );
+        $this->ensureConfigured();
 
         $redirectUri ??= config(
             'waba.embedded.redirect_uri'
         );
 
-        $response = Http::asForm()
-            ->acceptJson()
-            ->post(
-                "{$grapUrl}/oauth/access_token",
-                [
+        try {
+            $payload = $this->client
+                ->get('/oauth/access_token', [
                     'client_id' => config(
                         'waba.meta.app_id'
                     ),
                     'client_secret' => config(
                         'waba.meta.app_secret'
                     ),
-                    'code' => $code,
-                    'grant_type' => 'authorization_code',
                     'redirect_uri' => $redirectUri,
-                ]
-            );
+                    'code' => $code,
+                ]);
 
-        if ($response->failed()) {
+            if (!data_get($payload, 'access_token')) {
+
+                throw new TokenExchangeException(
+                    'Meta access token not returned.'
+                );
+            }
+
+            return [
+                'access_token' => data_get(
+                    $payload,
+                    'access_token'
+                ),
+                'token_type' => data_get(
+                    $payload,
+                    'token_type',
+                    'bearer'
+                ),
+                'expires_in' => data_get(
+                    $payload,
+                    'expires_in'
+                ),
+                'payload' => $payload,
+            ];
+        } catch (\Throwable $e) {
+            if ($e instanceof TokenExchangeException) {
+                throw $e;
+            }
+
             throw new TokenExchangeException(
-                data_get(
-                    $response->json(),
-                    'error.message',
-                    $response->body()
-                )
+                $e->getMessage(),
+            );
+        }
+    }
 
+    protected function ensureConfigured(): void
+    {
+        if (!config('waba.meta.app_id')) {
+
+            throw new TokenExchangeException(
+                'META_APP_ID is not configured.'
             );
         }
 
-        $payload = $response->json();
-
-        if (!data_get($payload, 'access_token')) {
+        if (!config('waba.meta.app_secret')) {
 
             throw new TokenExchangeException(
-                'Meta access token not returned.'
+                'META_APP_SECRET is not configured.'
             );
         }
 
-        return [
-            'access_token' => data_get(
-                $payload,
-                'access_token'
-            ),
-            'token_type' => data_get(
-                $payload,
-                'token_type'
-            ),
-            'payload' => $payload,
-        ];
+        if (!config('waba.embedded.redirect_uri')) {
+
+            throw new TokenExchangeException(
+                'META_REDIRECT_URI is not configured.'
+            );
+        }
     }
 }

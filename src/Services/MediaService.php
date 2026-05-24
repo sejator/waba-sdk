@@ -3,6 +3,7 @@
 namespace Sejator\WabaSdk\Services;
 
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\File;
 use Sejator\WabaSdk\Exceptions\WabaException;
 
 class MediaService
@@ -11,153 +12,203 @@ class MediaService
         protected Client $client
     ) {}
 
-    /**
-     * Upload media
-     */
-    public function upload(string $phoneNumberId, $file, ?string $type = null): array
+    public function upload(string $phoneNumberId, UploadedFile|string $file, ?string $type = null,): array
     {
         $endpoint = "/{$phoneNumberId}/media";
 
         if ($file instanceof UploadedFile) {
-
             if (!$file->isValid()) {
-                throw new WabaException('Invalid uploaded file');
+                throw new WabaException(
+                    'Invalid uploaded file.'
+                );
             }
 
             $stream = fopen($file->getRealPath(), 'r');
 
-            $multipart = [
-                [
-                    'name' => 'file',
-                    'contents' => $stream,
-                    'filename' => $file->getClientOriginalName(),
-                ],
-                [
-                    'name' => 'messaging_product',
-                    'contents' => 'whatsapp',
-                ],
-                [
-                    'name' => 'type',
-                    'contents' => $type ?? $file->getMimeType(),
-                ],
-            ];
+            try {
 
-            $response = $this->client->multipart($endpoint, $multipart);
-
-            fclose($stream);
-
-            return $response;
+                return $this->client->multipart(
+                    $endpoint,
+                    [
+                        [
+                            'name' => 'file',
+                            'contents' => $stream,
+                            'filename' => $file->getClientOriginalName(),
+                        ],
+                        [
+                            'name' => 'messaging_product',
+                            'contents' => 'whatsapp',
+                        ],
+                        [
+                            'name' => 'type',
+                            'contents' => $type ?? $file->getMimeType(),
+                        ],
+                    ]
+                );
+            } finally {
+                fclose($stream);
+            }
         }
 
         if (is_string($file) && file_exists($file)) {
 
             $stream = fopen($file, 'r');
 
-            $multipart = [
-                [
-                    'name' => 'file',
-                    'contents' => $stream,
-                    'filename' => basename($file),
-                ],
-                [
-                    'name' => 'messaging_product',
-                    'contents' => 'whatsapp',
-                ],
-            ];
-
-            if ($type) {
-                $multipart[] = [
-                    'name' => 'type',
-                    'contents' => $type,
+            try {
+                $multipart = [
+                    [
+                        'name' => 'file',
+                        'contents' => $stream,
+                        'filename' => basename($file),
+                    ],
+                    [
+                        'name' => 'messaging_product',
+                        'contents' => 'whatsapp',
+                    ],
                 ];
+
+                if ($type) {
+                    $multipart[] = [
+                        'name' => 'type',
+                        'contents' => $type,
+                    ];
+                }
+
+                return $this->client->multipart(
+                    $endpoint,
+                    $multipart
+                );
+            } finally {
+                fclose($stream);
             }
-
-            $response = $this->client->multipart($endpoint, $multipart);
-
-            fclose($stream);
-
-            return $response;
         }
 
-        throw new WabaException('Invalid file input');
+        throw new WabaException(
+            'Invalid file input.'
+        );
     }
 
     public function uploadMediaTemplate(string $appId, string $filePath): string
     {
         if (!file_exists($filePath)) {
-            throw new WabaException("File tidak ditemukan: {$filePath}");
+            throw new WabaException(
+                "File tidak ditemukan: {$filePath}"
+            );
         }
 
-        $fileSize = filesize($filePath);
-        $fileName = basename($filePath);
-        $mime = mime_content_type($filePath);
+        $mime = File::mimeType($filePath);
 
-        $allowed = [
-            'image/jpeg',
-            'image/png',
-            'video/mp4',
-            'application/pdf',
-        ];
+        if (!$mime) {
+
+            throw new WabaException(
+                'Gagal mendeteksi mime type.'
+            );
+        }
+
+        $allowed = ['image/jpeg', 'image/png', 'video/mp4', 'application/pdf'];
 
         if (!in_array($mime, $allowed)) {
-            throw new WabaException("Mime type tidak didukung: {$mime}");
+            throw new WabaException(
+                "Mime type tidak didukung: {$mime}"
+            );
         }
 
-        $session = $this->client->postWithQuery("/{$appId}/uploads", [
-            'file_name'   => $fileName,
-            'file_length' => $fileSize,
-            'file_type'   => $mime,
-        ]);
 
-        if (!isset($session['id'])) {
-            throw new WabaException('Gagal membuat upload session');
+        $size = filesize($filePath);
+
+        if (!$size) {
+
+            throw new WabaException(
+                'Gagal membaca ukuran file.'
+            );
         }
 
-        $uploadId = $session['id'];
+        $session = $this->client
+            ->postWithQuery(
+                "/{$appId}/uploads",
+                [
+                    'file_name' => basename(
+                        $filePath
+                    ),
+                    'file_length' => $size,
+                    'file_type' => $mime,
+                ]
+            );
 
-        $binary = file_get_contents($filePath);
+        $uploadId = data_get(
+            $session,
+            'id'
+        );
 
-        $res = $this->client->uploadBinary($uploadId, $binary);
+        if (!$uploadId) {
 
-        if (!isset($res['h'])) {
-            throw new WabaException('Upload gagal: handle tidak ditemukan');
+            throw new WabaException(
+                'Gagal membuat upload session.'
+            );
         }
 
-        return $res['h'];
+        $binary = file_get_contents(
+            $filePath
+        );
+
+        if ($binary === false) {
+
+            throw new WabaException(
+                'Gagal membaca file binary.'
+            );
+        }
+
+        $response = $this->client
+            ->uploadBinary(
+                $uploadId,
+                $binary
+            );
+
+        $handle = data_get(
+            $response,
+            'h'
+        );
+
+        if (!$handle) {
+
+            throw new WabaException(
+                'Upload gagal: media handle tidak ditemukan.'
+            );
+        }
+
+        return $handle;
     }
 
-    /**
-     * Shortcut ambil media_id
-     */
-    public function uploadAndGetId(string $phoneNumberId, $file, ?string $type = null): ?string
+    public function uploadAndGetId(string $phoneNumberId, UploadedFile|string $file, ?string $type = null): ?string
     {
-        $res = $this->upload($phoneNumberId, $file, $type);
-
-        return $res['id'] ?? null;
+        return data_get(
+            $this->upload(
+                $phoneNumberId,
+                $file,
+                $type
+            ),
+            'id'
+        );
     }
 
-    /**
-     * Get media metadata
-     */
     public function get(string $mediaId): array
     {
-        return $this->client->get("/{$mediaId}");
+        return $this->client->get(
+            "/{$mediaId}"
+        );
     }
 
-    /**
-     * Download media binary
-     */
-    public function download(string $mediaUrl)
+    public function download(string $mediaUrl): string
     {
-        return $this->client->getRaw($mediaUrl);
+        return $this->client
+            ->getRaw($mediaUrl);
     }
 
-    /**
-     * Delete media
-     */
     public function delete(string $mediaId): bool
     {
-        $this->client->delete("/{$mediaId}");
+        $this->client->delete(
+            "/{$mediaId}"
+        );
 
         return true;
     }

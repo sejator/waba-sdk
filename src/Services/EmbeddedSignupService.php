@@ -2,8 +2,9 @@
 
 namespace Sejator\WabaSdk\Services;
 
+use RuntimeException;
 use Sejator\WabaSdk\DTO\EmbeddedSignupResult;
-
+use Sejator\WabaSdk\Support\ComponentNormalizer;
 use Sejator\WabaSdk\Support\Embedded\OAuthUrlGenerator;
 use Sejator\WabaSdk\Support\Embedded\TokenExchanger;
 use Sejator\WabaSdk\Support\Embedded\WebhookSubscriber;
@@ -11,77 +12,63 @@ use Sejator\WabaSdk\Support\Embedded\WebhookSubscriber;
 class EmbeddedSignupService
 {
     public function __construct(
-
         protected Client $client,
         protected OAuthUrlGenerator $urlGenerator,
-
         protected TokenExchanger $tokenExchanger,
         protected WebhookSubscriber $subscriber,
-
         protected BusinessService $businesses,
         protected PhoneNumberService $phones,
+        protected TemplateService $templates,
+        protected WabaResolverService $resolver,
+        protected ComponentNormalizer $normalizer,
     ) {}
 
-    /*
-    |--------------------------------------------------------------------------
-    | Generate Embedded Signup URL
-    |--------------------------------------------------------------------------
-    */
-
-    public function signupUrl(
-        ?string $state = null
-    ): array {
+    public function signupUrl(?string $state = null, array $scopes = []): array
+    {
 
         return $this->urlGenerator
-            ->generate($state);
+            ->generate(
+                state: $state,
+                scopes: $scopes,
+            );
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | Exchange Authorization Code
-    |--------------------------------------------------------------------------
-    */
-
-    public function exchangeCode(
-        string $code
-    ): array {
-
+    public function exchangeCode(string $code, ?string $redirectUri = null): array
+    {
         return $this->tokenExchanger
-            ->exchange($code);
+            ->exchange(
+                code: $code,
+                redirectUri: $redirectUri,
+            );
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | Provision Embedded Assets
-    |--------------------------------------------------------------------------
-    |
-    | Official Meta Flow:
-    |
-    | 1. Fetch WABA
-    | 2. Fetch Phones
-    | 3. Subscribe App
-    |
-    */
+    /**
+     * Provision Embedded Assets
+     * Official Meta Flow:
+     * 
+     * 1. Resolve WABA
+     * 2. Fetch WABA
+     * 3. Fetch Phones
+     * 4. Fetch Templates
+     * 5. Subscribe App
+     */
+    public function provision(string $accessToken, ?string $wabaId = null): EmbeddedSignupResult
+    {
+        if (!$wabaId && config('waba.embedded.auto_resolve_waba', true)) {
+            $wabaId = $this->resolver
+                ->resolveFromAccessToken(
+                    $accessToken
+                );
+        }
 
-    public function provision(
-        string $accessToken,
-        ?string $wabaId = null,
-    ): EmbeddedSignupResult {
-
-        /*
-        |--------------------------------------------------------------------------
-        | Graph Client
-        |--------------------------------------------------------------------------
-        */
+        if (!$wabaId) {
+            throw new RuntimeException(
+                'Unable to resolve WABA ID.'
+            );
+        }
 
         $graph = $this->client
             ->withToken($accessToken);
-
-        /*
-        |--------------------------------------------------------------------------
-        | Override Services
-        |--------------------------------------------------------------------------
-        */
 
         $businesses = new BusinessService(
             $graph
@@ -91,200 +78,93 @@ class EmbeddedSignupService
             $graph
         );
 
-        /*
-        |--------------------------------------------------------------------------
-        | Resolve WABA ID
-        |--------------------------------------------------------------------------
-        |
-        | Optional:
-        | You may pass explicit WABA ID.
-        |
-        */
+        $templates = new TemplateService(
+            $graph,
+            $this->normalizer
+        );
 
-        if (!$wabaId) {
+        $waba = $businesses->waba($wabaId);
 
-            throw new \RuntimeException(
-                'WABA ID is required for provisioning.'
+        $phoneResponse = [];
+
+        if (config('waba.embedded.auto_fetch_phone_numbers', true)) {
+            $phoneResponse = $phones
+                ->all($wabaId);
+        }
+
+        $templateResponse = [];
+
+        if (config('waba.embedded.auto_fetch_templates', true)) {
+            $templateResponse = $templates
+                ->all($wabaId);
+        }
+
+        $phone = collect(
+            data_get($phoneResponse, 'data', [])
+        )->first();
+
+        if (config('waba.embedded.auto_subscribe_webhook', true)) {
+            $this->subscribeWebhook(
+                $wabaId,
+                $accessToken
             );
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | Fetch WABA
-        |--------------------------------------------------------------------------
-        */
-
-        $waba = $businesses->waba(
-            $wabaId
-        );
-
-        /*
-        |--------------------------------------------------------------------------
-        | Fetch Phone Numbers
-        |--------------------------------------------------------------------------
-        */
-
-        $phoneResponse = $phones->all(
-            $wabaId
-        );
-
-        $phone = collect(
-            data_get(
-                $phoneResponse,
-                'data',
-                []
-            )
-        )->first();
-
-        /*
-        |--------------------------------------------------------------------------
-        | Subscribe App
-        |--------------------------------------------------------------------------
-        */
-
-        $this->subscribeWebhook(
-            $wabaId,
-            $accessToken
-        );
-
-        /*
-        |--------------------------------------------------------------------------
-        | Result DTO
-        |--------------------------------------------------------------------------
-        */
-
         return EmbeddedSignupResult::fromArray([
-
-            /*
-            |--------------------------------------------------------------------------
-            | Token
-            |--------------------------------------------------------------------------
-            */
-
-            'access_token' =>
-            $accessToken,
-
-            /*
-            |--------------------------------------------------------------------------
-            | Business
-            |--------------------------------------------------------------------------
-            */
-
-            'business_id' => data_get(
-                $waba,
-                'owner_business_info.id'
-            ),
-
-            'business_name' => data_get(
-                $waba,
-                'owner_business_info.name'
-            ),
-
-            /*
-            |--------------------------------------------------------------------------
-            | WABA
-            |--------------------------------------------------------------------------
-            */
-
+            'access_token' => $accessToken,
             'waba_id' => data_get(
                 $waba,
                 'id'
             ),
-
-            /*
-            |--------------------------------------------------------------------------
-            | Phone
-            |--------------------------------------------------------------------------
-            */
-
+            'business_id' => data_get(
+                $waba,
+                'owner_business_info.id'
+            ),
+            'business_name' => data_get(
+                $waba,
+                'owner_business_info.name'
+            ),
             'phone_number_id' => data_get(
                 $phone,
                 'id'
             ),
-
             'display_phone_number' => data_get(
                 $phone,
                 'display_phone_number'
             ),
-
-            /*
-            |--------------------------------------------------------------------------
-            | Phones
-            |--------------------------------------------------------------------------
-            */
-
             'phone_numbers' => data_get(
                 $phoneResponse,
                 'data',
                 []
             ),
-
-            /*
-            |--------------------------------------------------------------------------
-            | Templates
-            |--------------------------------------------------------------------------
-            */
-
             'templates' => data_get(
                 $templateResponse,
                 'data',
                 []
             ),
-
-            /*
-            |--------------------------------------------------------------------------
-            | Payload
-            |--------------------------------------------------------------------------
-            */
-
-            'payload' => [
-
-                'waba' =>
-                $waba,
-
-                'phones' =>
-                $phoneResponse,
-
-                'templates' =>
-                $templateResponse,
-
+            'metadata' => [
+                'embedded_version' => config(
+                    'waba.embedded.version'
+                ),
+                'api_version' => config(
+                    'waba.meta.api_version'
+                ),
+                'resolved_waba' => true,
             ],
-
         ]);
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | Subscribe App To WABA
-    |--------------------------------------------------------------------------
-    */
+    public function subscribeWebhook(string $wabaId, ?string $accessToken = null): array
+    {
+        $client = $accessToken ? $this->client->withToken($accessToken)
+            : $this->client
+            ->system();
 
-    public function subscribeWebhook(
-        string $wabaId,
-        ?string $accessToken = null,
-    ): array {
+        $subscriber = new WebhookSubscriber(
+            $client
+        );
 
-        /*
-        |--------------------------------------------------------------------------
-        | Dynamic Token
-        |--------------------------------------------------------------------------
-        */
-
-        if ($accessToken) {
-
-            $client = $this->client
-                ->withToken($accessToken);
-
-            $subscriber =
-                new WebhookSubscriber(
-                    $client
-                );
-
-            return $subscriber
-                ->subscribe($wabaId);
-        }
-
-        return $this->subscriber
+        return $subscriber
             ->subscribe($wabaId);
     }
 }

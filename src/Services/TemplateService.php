@@ -2,13 +2,13 @@
 
 namespace Sejator\WabaSdk\Services;
 
+use Illuminate\Support\Collection;
 use Sejator\WabaSdk\Support\ComponentNormalizer;
 
 class TemplateService
 {
     public function __construct(
-        protected Client $client,
-        protected ComponentNormalizer $normalizer
+        protected Client $client
     ) {}
 
     protected function endpoint(string $wabaId): string
@@ -16,77 +16,149 @@ class TemplateService
         return "/{$wabaId}/message_templates";
     }
 
-    /**
-     * Create Template
-     */
     public function create(string $wabaId, array $payload): array
     {
-        $payload['components'] = $this->normalizer->normalize(
-            $payload['components'] ?? []
+
+        if (!empty($payload['components'])) {
+            $payload['components'] = $this->normalizeComponents(
+                $payload['components']
+            );
+        }
+
+        $payload['category'] ??= 'UTILITY';
+        $payload['language'] ??= 'en_US';
+
+        return $this->client->post(
+            $this->endpoint($wabaId),
+            $payload
         );
-
-        return $this->client->post($this->endpoint($wabaId), $payload);
     }
 
-    /**
-     * Get all templates
-     */
-    public function all(string $wabaId): array
+    public function all(string $wabaId, array $query = []): array
     {
-        return $this->client->get($this->endpoint($wabaId));
+        $query['limit'] ??= 100;
+
+        return $this->client->get(
+            $this->endpoint($wabaId),
+            $query
+        );
     }
 
-    /**
-     * Get detail template
-     */
-    public function detail(string $templateId): array
+    public function collection(string $wabaId, array $query = []): Collection
     {
-        return $this->client->get("/{$templateId}");
+        return collect(
+            data_get(
+                $this->all($wabaId, $query),
+                'data',
+                []
+            )
+        );
     }
 
-    /**
-     * Delete template by name
-     */
-    public function delete(string $wabaId, string $name): bool
+    public function find(string $templateId, array $fields = []): array
     {
-        $endpoint = $this->endpoint($wabaId) . '?name=' . urlencode($name);
+        if (empty($fields)) {
+            $fields = [
+                'id',
+                'name',
+                'language',
+                'status',
+                'category',
+                'quality_score',
+                'components',
+            ];
+        }
 
-        $this->client->delete($endpoint);
+        return $this->client->get(
+            "/{$templateId}",
+            [
+                'fields' => implode(
+                    ',',
+                    $fields
+                ),
+            ]
+        );
+    }
+
+    public function delete(string $wabaId, string $name,): bool
+    {
+        $this->client->delete(
+            $this->endpoint($wabaId),
+            [
+                'name' => $name,
+            ]
+        );
 
         return true;
     }
 
-    /**
-     * Sync templates
-     */
     public function sync(string $wabaId): array
     {
         return $this->all($wabaId);
     }
 
-    /**
-     * Check template exists by name
-     */
     public function exists(string $wabaId, string $name): bool
     {
-        $templates = $this->all($wabaId);
-
-        return collect(data_get($templates, 'data', []))
-            ->contains(fn($tpl) => $tpl['name'] === $name);
+        return $this->collection($wabaId)
+            ->contains(
+                fn(array $template) => data_get(
+                    $template,
+                    'name'
+                ) === $name
+            );
     }
 
-    /**
-     * Create or update
-     */
     public function createIfNotExists(string $wabaId, array $payload): array
     {
-        if ($this->exists($wabaId, $payload['name'])) {
+        $name = data_get(
+            $payload,
+            'name'
+        );
+
+        if (!$name) {
             return [
-                'status' => 'exists',
-                'message' => 'Template already exists'
+                'status' => 'error',
+                'message' => 'Template name is required.',
             ];
         }
 
-        return $this->create($wabaId, $payload);
+        if ($this->exists($wabaId, $name)) {
+            return [
+                'status' => 'exists',
+                'message' => 'Template already exists.',
+            ];
+        }
+
+        return $this->create(
+            $wabaId,
+            $payload
+        );
+    }
+
+    public function byCategory(string $wabaId, string $category): Collection
+    {
+        return $this->collection(
+            $wabaId,
+            [
+                'category' => $category,
+            ]
+        );
+    }
+
+    public function approved(string $wabaId): Collection
+    {
+        return $this->collection(
+            $wabaId,
+            [
+                'status' => 'APPROVED',
+            ]
+        );
+    }
+
+    protected function normalizeComponents(array $components): array
+    {
+        return app(ComponentNormalizer::class)->normalize(
+            $components
+        );
     }
 }

@@ -3,17 +3,22 @@
 namespace Sejator\WabaSdk\Support\Embedded;
 
 use Illuminate\Support\Facades\Cache;
+use Sejator\WabaSdk\Contracts\StateStore;
 use Sejator\WabaSdk\DTO\EmbeddedSignupSession;
 
-class EmbeddedStateManager
+class CacheStateStore implements StateStore
 {
-    protected string $prefix = 'waba_embedded_state:';
 
-    protected int $ttl = 300;
+    protected string $prefix = 'waba_embedded_state:';
+    protected int $ttl;
+
+    public function __construct()
+    {
+        $this->ttl = config('waba.embedded.state_ttl', 300);
+    }
 
     public function put(EmbeddedSignupSession $session): void
     {
-
         Cache::put(
             $this->key($session->state),
             $session->toArray(),
@@ -25,7 +30,6 @@ class EmbeddedStateManager
 
     public function get(string $state): ?EmbeddedSignupSession
     {
-
         $payload = Cache::get(
             $this->key($state)
         );
@@ -34,34 +38,27 @@ class EmbeddedStateManager
             return null;
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | Restore DTO
-        |--------------------------------------------------------------------------
-        */
-
         return EmbeddedSignupSession::make([
             ...$payload,
-            'created_at' =>
-            data_get($payload, 'created_at')
-                ? now()->parse(
-                    data_get(
-                        $payload,
-                        'created_at'
-                    )
+            'created_at' => data_get(
+                $payload,
+                'created_at'
+            ) ? now()->parse(
+                data_get(
+                    $payload,
+                    'created_at'
                 )
-                : null,
+            ) : null,
 
-            'completed_at' =>
-            data_get($payload, 'completed_at')
-                ? now()->parse(
-                    data_get(
-                        $payload,
-                        'completed_at'
-                    )
+            'completed_at' => data_get(
+                $payload,
+                'completed_at'
+            ) ? now()->parse(
+                data_get(
+                    $payload,
+                    'completed_at'
                 )
-                : null,
-
+            ) : null,
         ]);
     }
 
@@ -81,9 +78,9 @@ class EmbeddedStateManager
 
     public function pull(string $state): ?EmbeddedSignupSession
     {
-
-        $session = $this->get($state);
-
+        $session = $this->get(
+            $state
+        );
         $this->forget($state);
 
         return $session;

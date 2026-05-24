@@ -12,6 +12,26 @@ class WebhookSubscriber
 
     public function subscribe(string $wabaId): array
     {
-        return $this->client->post($wabaId . '/subscribed_apps');
+
+        return $this->client->post(
+            "{$wabaId}/subscribed_apps",
+            [
+                'override_callback_uri' => false,
+            ]
+        );
+    }
+
+    public function subscribedApps(string $wabaId): array
+    {
+        return $this->client->get(
+            "{$wabaId}/subscribed_apps"
+        );
+    }
+
+    public function unsubscribe(string $wabaId): array
+    {
+        return $this->client->delete(
+            "{$wabaId}/subscribed_apps"
+        );
     }
 }

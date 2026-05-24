@@ -5,111 +5,64 @@ namespace Sejator\WabaSdk\DTO;
 class PhoneNumber
 {
     public function __construct(
-
-        /*
-        |--------------------------------------------------------------------------
-        | Meta Phone Number ID
-        |--------------------------------------------------------------------------
-        */
-
         public readonly string $id,
-
-        /*
-        |--------------------------------------------------------------------------
-        | Display Number
-        |--------------------------------------------------------------------------
-        */
-
         public readonly ?string $displayPhoneNumber = null,
-
-        /*
-        |--------------------------------------------------------------------------
-        | Verified Name
-        |--------------------------------------------------------------------------
-        */
-
         public readonly ?string $verifiedName = null,
-
-        /*
-        |--------------------------------------------------------------------------
-        | Quality Rating
-        |--------------------------------------------------------------------------
-        */
-
-        public readonly ?string $qualityRating = null,
-
-        /*
-        |--------------------------------------------------------------------------
-        | Status
-        |--------------------------------------------------------------------------
-        */
-
         public readonly ?string $status = null,
-
-        /*
-        |--------------------------------------------------------------------------
-        | Platform Type
-        |--------------------------------------------------------------------------
-        */
-
+        public readonly ?string $qualityRating = null,
+        public readonly ?string $qualityScore = null,
         public readonly ?string $platformType = null,
-
-        /*
-        |--------------------------------------------------------------------------
-        | Throughput
-        |--------------------------------------------------------------------------
-        */
-
+        public readonly ?string $codeVerificationStatus = null,
         public readonly ?string $throughput = null,
-
-        /*
-        |--------------------------------------------------------------------------
-        | Raw Payload
-        |--------------------------------------------------------------------------
-        */
-
-        public readonly array $payload = [],
-
-    ) {}
+        public readonly array $metadata = [],
+    ) {
+        //
+    }
 
     public static function fromArray(array $data): self
     {
         return new self(
-
-            id: (string) data_get($data, 'id'),
-
+            id: (string) data_get(
+                $data,
+                'id'
+            ),
             displayPhoneNumber: data_get(
                 $data,
                 'display_phone_number'
             ),
-
             verifiedName: data_get(
                 $data,
                 'verified_name'
             ),
-
-            qualityRating: data_get(
-                $data,
-                'quality_rating'
-            ),
-
             status: data_get(
                 $data,
                 'status'
             ),
-
+            qualityRating: data_get(
+                $data,
+                'quality_rating'
+            ),
+            qualityScore: data_get(
+                $data,
+                'quality_score'
+            ),
             platformType: data_get(
                 $data,
                 'platform_type'
             ),
-
+            codeVerificationStatus: data_get(
+                $data,
+                'code_verification_status'
+            ),
             throughput: data_get(
                 $data,
                 'throughput.level'
             ),
-
-            payload: $data,
-
+            metadata: data_get(
+                $data,
+                'metadata',
+                []
+            ),
         );
     }
 
@@ -119,11 +72,13 @@ class PhoneNumber
             'id' => $this->id,
             'display_phone_number' => $this->displayPhoneNumber,
             'verified_name' => $this->verifiedName,
-            'quality_rating' => $this->qualityRating,
             'status' => $this->status,
+            'quality_rating' => $this->qualityRating,
+            'quality_score' => $this->qualityScore,
             'platform_type' => $this->platformType,
+            'code_verification_status' => $this->codeVerificationStatus,
             'throughput' => $this->throughput,
-            'payload' => $this->payload,
+            'metadata' => $this->metadata,
         ];
     }
 }

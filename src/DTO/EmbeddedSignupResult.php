@@ -5,125 +5,110 @@ namespace Sejator\WabaSdk\DTO;
 class EmbeddedSignupResult
 {
     public function __construct(
-
-        /*
-        |--------------------------------------------------------------------------
-        | Access Token
-        |--------------------------------------------------------------------------
-        */
-
+        public readonly string $status,
         public readonly string $accessToken,
-
-        /*
-        |--------------------------------------------------------------------------
-        | Meta Business
-        |--------------------------------------------------------------------------
-        */
-
-        public readonly ?string $businessId = null,
-
-        public readonly ?string $businessName = null,
-
-        /*
-        |--------------------------------------------------------------------------
-        | WhatsApp Business Account
-        |--------------------------------------------------------------------------
-        */
-
-        public readonly ?string $wabaId = null,
-
-        public readonly ?string $wabaName = null,
-
-        /*
-        |--------------------------------------------------------------------------
-        | Phone Number
-        |--------------------------------------------------------------------------
-        */
-
-        public readonly ?string $phoneNumberId = null,
-
-        public readonly ?string $displayPhoneNumber = null,
-
-        /*
-        |--------------------------------------------------------------------------
-        | Embedded Signup Status
-        |--------------------------------------------------------------------------
-        */
-
-        public readonly ?string $status = null,
-
-        /*
-        |--------------------------------------------------------------------------
-        | Raw Payload
-        |--------------------------------------------------------------------------
-        */
-
-        public readonly array $payload = [],
-
-    ) {}
+        public readonly ?WabaAccount $waba = null,
+        public readonly ?PhoneNumber $phone = null,
+        public readonly array $phoneNumbers = [],
+        public readonly array $templates = [],
+        public readonly array $metadata = [],
+    ) {
+        //
+    }
 
     public static function fromArray(array $data): self
     {
-        return new self(
+        $phones = collect(
+            data_get(
+                $data,
+                'phone_numbers',
+                []
+            )
+        )->map(
+            fn(array $phone)
+            => PhoneNumber::fromArray(
+                $phone
+            )
+        )->values()
+            ->all();
 
+        $primaryPhone = !empty($phones)
+            ? $phones[0]
+            : null;
+
+        $waba = null;
+
+        if (data_get($data, 'waba_id')) {
+
+            $waba = WabaAccount::fromArray([
+                'id' => data_get(
+                    $data,
+                    'waba_id'
+                ),
+                'name' => data_get(
+                    $data,
+                    'waba_name'
+                ),
+                'currency' => data_get(
+                    $data,
+                    'currency'
+                ),
+                'timezone_id' => data_get(
+                    $data,
+                    'timezone_id'
+                ),
+                'business_id' => data_get(
+                    $data,
+                    'business_id'
+                ),
+                'business_name' => data_get(
+                    $data,
+                    'business_name'
+                ),
+            ]);
+        }
+
+        return new self(
+            status: (string) data_get(
+                $data,
+                'status',
+                'completed'
+            ),
             accessToken: (string) data_get(
                 $data,
-                'access_token',
-                ''
+                'access_token'
             ),
-
-            businessId: data_get(
+            waba: $waba,
+            phone: $primaryPhone,
+            phoneNumbers: $phones,
+            templates: data_get(
                 $data,
-                'business_id'
+                'templates',
+                []
             ),
-
-            businessName: data_get(
+            metadata: data_get(
                 $data,
-                'business_name'
+                'metadata',
+                []
             ),
-
-            wabaId: data_get(
-                $data,
-                'waba_id'
-            ),
-
-            wabaName: data_get(
-                $data,
-                'waba_name'
-            ),
-
-            phoneNumberId: data_get(
-                $data,
-                'phone_number_id'
-            ),
-
-            displayPhoneNumber: data_get(
-                $data,
-                'display_phone_number'
-            ),
-
-            status: data_get(
-                $data,
-                'status'
-            ),
-
-            payload: $data,
-
         );
     }
 
     public function toArray(): array
     {
         return [
-            'access_token' => $this->accessToken,
-            'business_id' => $this->businessId,
-            'business_name' => $this->businessName,
-            'waba_id' => $this->wabaId,
-            'waba_name' => $this->wabaName,
-            'phone_number_id' => $this->phoneNumberId,
-            'display_phone_number' => $this->displayPhoneNumber,
             'status' => $this->status,
-            'payload' => $this->payload,
+            'access_token' => $this->accessToken,
+            'waba' => $this->waba?->toArray(),
+            'phone' => $this->phone?->toArray(),
+            'phone_numbers' => collect(
+                $this->phoneNumbers
+            )->map(
+                fn(PhoneNumber $phone)
+                => $phone->toArray()
+            )->values()->all(),
+            'templates' => $this->templates,
+            'metadata' => $this->metadata,
         ];
     }
 }
