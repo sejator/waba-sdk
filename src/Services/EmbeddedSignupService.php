@@ -139,10 +139,20 @@ class EmbeddedSignupService
             )
         )->first();
 
+        $subscription = null;
         if (config('waba.embedded.auto_subscribe_webhook', true)) {
-            $this->subscribeWebhook(
+            $subscription = $this->subscribeWebhook(
                 $wabaId,
                 $accessToken
+            );
+        }
+
+        $registration = null;
+
+        if (config('waba.embedded.auto_register_phone', true) && data_get($phone, 'id')) {
+            $registration = $this->registerPhone(
+                $phones,
+                $phone
             );
         }
 
@@ -172,6 +182,9 @@ class EmbeddedSignupService
                 $phone,
                 'display_phone_number'
             ),
+            'webhook_subscription' => $subscription,
+            'phone_registration' => $registration,
+
             'payload' => [
                 'waba' => $waba,
                 'phone_numbers' => data_get(
@@ -179,6 +192,8 @@ class EmbeddedSignupService
                     'data',
                     []
                 ),
+                'webhook_subscription' => $subscription,
+                'phone_registration' => $registration,
                 'metadata' => [
                     'embedded_version' => config(
                         'waba.embedded.version'
@@ -235,5 +250,47 @@ class EmbeddedSignupService
                 $accessToken
             )
         );
+    }
+
+    protected function registerPhone(PhoneNumberService $phones, array $phone): array
+    {
+        $phoneId = data_get(
+            $phone,
+            'id'
+        );
+
+        if (!$phoneId) {
+            return [
+                'success' => false,
+                'message' => 'Phone number ID missing.',
+            ];
+        }
+
+        if (data_get($phone, 'code_verification_status') === 'VERIFIED') {
+            return [
+                'success' => true,
+                'skipped' => true,
+                'message' => 'Phone already verified.',
+            ];
+        }
+
+        try {
+            $response = $phones->register(
+                $phoneId,
+                config('waba.embedded.default_pin', '123456')
+            );
+
+            return [
+                'success' => true,
+                'response' => $response,
+            ];
+        } catch (\Throwable $e) {
+            report($e);
+
+            return [
+                'success' => false,
+                'message' => $e->getMessage(),
+            ];
+        }
     }
 }

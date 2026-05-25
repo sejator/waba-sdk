@@ -10,6 +10,8 @@ class EmbeddedSignupResult
         public readonly ?WabaAccount $waba = null,
         public readonly ?PhoneNumber $phone = null,
         public readonly array $phoneNumbers = [],
+        public readonly ?array $webhookSubscription = null,
+        public readonly ?array $phoneRegistration = null,
         public readonly array $metadata = [],
         public readonly array $payload = [],
     ) {
@@ -22,7 +24,11 @@ class EmbeddedSignupResult
             data_get(
                 $data,
                 'phone_numbers',
-                []
+                data_get(
+                    $data,
+                    'payload.phone_numbers',
+                    []
+                )
             )
         )->map(
             fn(array $phone) => PhoneNumber::fromArray(
@@ -100,10 +106,30 @@ class EmbeddedSignupResult
             waba: $waba,
             phone: $primaryPhone,
             phoneNumbers: $phones,
+            webhookSubscription: data_get(
+                $data,
+                'webhook_subscription',
+                data_get(
+                    $data,
+                    'payload.webhook_subscription'
+                )
+            ),
+            phoneRegistration: data_get(
+                $data,
+                'phone_registration',
+                data_get(
+                    $data,
+                    'payload.phone_registration'
+                )
+            ),
             metadata: data_get(
                 $data,
                 'metadata',
-                []
+                data_get(
+                    $data,
+                    'payload.metadata',
+                    []
+                )
             ),
             payload: data_get(
                 $data,
@@ -143,6 +169,24 @@ class EmbeddedSignupResult
         return $this->phone?->displayPhoneNumber;
     }
 
+    public function webhookSubscribed(): bool
+    {
+        return (bool) data_get(
+            $this->webhookSubscription,
+            'success',
+            false
+        );
+    }
+
+    public function phoneRegistered(): bool
+    {
+        return (bool) data_get(
+            $this->phoneRegistration,
+            'success',
+            false
+        );
+    }
+
     public function toArray(): array
     {
         return [
@@ -162,6 +206,8 @@ class EmbeddedSignupResult
                 fn(PhoneNumber $phone)
                 => $phone->toArray()
             )->values()->all(),
+            'webhook_subscription' => $this->webhookSubscription,
+            'phone_registration' => $this->phoneRegistration,
             'metadata' => $this->metadata,
             'payload' => $this->payload,
         ];

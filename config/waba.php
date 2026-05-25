@@ -153,11 +153,21 @@ return [
             true
         ),
 
+        'auto_register_phone' => env(
+            'WABA_AUTO_REGISTER_PHONE',
+            true
+        ),
+
+        'default_pin' => env(
+            'WABA_DEFAULT_PIN',
+            '123456'
+        ),
+
         'auto_fetch_templates' => env(
             'META_AUTO_FETCH_TEMPLATES',
             true
         ),
-        
+
         'state_ttl' => env(
             'META_STATE_TTL',
             300
@@ -169,7 +179,7 @@ return [
             'WABA_HTTP_TIMEOUT',
             30
         ),
-        
+
         'retry' => [
             'times' => env(
                 'WABA_HTTP_RETRY_TIMES',
