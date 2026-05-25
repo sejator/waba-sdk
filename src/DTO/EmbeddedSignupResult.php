@@ -10,8 +10,8 @@ class EmbeddedSignupResult
         public readonly ?WabaAccount $waba = null,
         public readonly ?PhoneNumber $phone = null,
         public readonly array $phoneNumbers = [],
-        public readonly array $templates = [],
         public readonly array $metadata = [],
+        public readonly array $payload = [],
     ) {
         //
     }
@@ -25,12 +25,10 @@ class EmbeddedSignupResult
                 []
             )
         )->map(
-            fn(array $phone)
-            => PhoneNumber::fromArray(
+            fn(array $phone) => PhoneNumber::fromArray(
                 $phone
             )
-        )->values()
-            ->all();
+        )->values()->all();
 
         $primaryPhone = !empty($phones)
             ? $phones[0]
@@ -38,8 +36,7 @@ class EmbeddedSignupResult
 
         $waba = null;
 
-        if (data_get($data, 'waba_id')) {
-
+        if (data_get($data,  'waba_id')) {
             $waba = WabaAccount::fromArray([
                 'id' => data_get(
                     $data,
@@ -68,6 +65,28 @@ class EmbeddedSignupResult
             ]);
         }
 
+        if (
+            !$primaryPhone
+            && data_get(
+                $data,
+                'phone_number_id'
+            )
+        ) {
+
+            $primaryPhone = PhoneNumber::fromArray([
+                'id' => data_get(
+                    $data,
+                    'phone_number_id'
+                ),
+                'display_phone_number' => data_get(
+                    $data,
+                    'display_phone_number'
+                ),
+            ]);
+
+            $phones[] = $primaryPhone;
+        }
+
         return new self(
             status: (string) data_get(
                 $data,
@@ -81,17 +100,47 @@ class EmbeddedSignupResult
             waba: $waba,
             phone: $primaryPhone,
             phoneNumbers: $phones,
-            templates: data_get(
-                $data,
-                'templates',
-                []
-            ),
             metadata: data_get(
                 $data,
                 'metadata',
                 []
             ),
+            payload: data_get(
+                $data,
+                'payload',
+                []
+            ),
         );
+    }
+
+    public function businessId(): ?string
+    {
+        return $this->waba?->businessId;
+    }
+
+    public function businessName(): ?string
+    {
+        return $this->waba?->businessName;
+    }
+
+    public function wabaId(): ?string
+    {
+        return $this->waba?->id;
+    }
+
+    public function wabaName(): ?string
+    {
+        return $this->waba?->name;
+    }
+
+    public function phoneNumberId(): ?string
+    {
+        return $this->phone?->id;
+    }
+
+    public function displayPhoneNumber(): ?string
+    {
+        return $this->phone?->displayPhoneNumber;
     }
 
     public function toArray(): array
@@ -99,6 +148,12 @@ class EmbeddedSignupResult
         return [
             'status' => $this->status,
             'access_token' => $this->accessToken,
+            'waba_id' => $this->waba?->id,
+            'waba_name' => $this->waba?->name,
+            'business_id' => $this->waba?->businessId,
+            'business_name' => $this->waba?->businessName,
+            'phone_number_id' => $this->phone?->id,
+            'display_phone_number' => $this->phone?->displayPhoneNumber,
             'waba' => $this->waba?->toArray(),
             'phone' => $this->phone?->toArray(),
             'phone_numbers' => collect(
@@ -107,8 +162,8 @@ class EmbeddedSignupResult
                 fn(PhoneNumber $phone)
                 => $phone->toArray()
             )->values()->all(),
-            'templates' => $this->templates,
             'metadata' => $this->metadata,
+            'payload' => $this->payload,
         ];
     }
 }

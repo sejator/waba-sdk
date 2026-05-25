@@ -119,9 +119,7 @@ class WabaServiceProvider extends ServiceProvider
                 subscriber: $app->make(WebhookSubscriber::class),
                 businesses: $app->make(BusinessService::class),
                 phones: $app->make(PhoneNumberService::class),
-                templates: $app->make(TemplateService::class),
                 resolver: $app->make(WabaResolverService::class),
-                normalizer: $app->make(ComponentNormalizer::class),
             )
         );
 

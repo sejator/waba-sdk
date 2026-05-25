@@ -4,7 +4,6 @@ namespace Sejator\WabaSdk\Services;
 
 use RuntimeException;
 use Sejator\WabaSdk\DTO\EmbeddedSignupResult;
-use Sejator\WabaSdk\Support\ComponentNormalizer;
 use Sejator\WabaSdk\Support\Embedded\OAuthUrlGenerator;
 use Sejator\WabaSdk\Support\Embedded\TokenExchanger;
 use Sejator\WabaSdk\Support\Embedded\WebhookSubscriber;
@@ -18,9 +17,7 @@ class EmbeddedSignupService
         protected WebhookSubscriber $subscriber,
         protected BusinessService $businesses,
         protected PhoneNumberService $phones,
-        protected TemplateService $templates,
         protected WabaResolverService $resolver,
-        protected ComponentNormalizer $normalizer,
     ) {}
 
     public function signupUrl(?string $state = null, array $scopes = []): array
@@ -33,7 +30,7 @@ class EmbeddedSignupService
             );
     }
 
-    public function exchangeCode(string $code, ?string $redirectUri = null): array
+    public function exchangeCode(string $code, ?string $redirectUri = null,): array
     {
         return $this->tokenExchanger
             ->exchange(
@@ -43,15 +40,64 @@ class EmbeddedSignupService
     }
 
     /**
+     * Complete Embedded Signup
+     *
+     * Flow:
+     *
+     * 1. Exchange OAuth Code
+     * 2. Resolve WABA
+     * 3. Fetch WABA
+     * 4. Fetch Phones
+     * 5. Subscribe Webhook
+     *
+     */
+    public function completeSignup(string $code, string $state): EmbeddedSignupResult
+    {
+        $token = $this->exchangeCode(
+            $code
+        );
+
+        $accessToken = data_get(
+            $token,
+            'access_token'
+        );
+
+        if (!$accessToken) {
+
+            throw new RuntimeException(
+                'Meta access token not returned.'
+            );
+        }
+
+        $result = $this->provision(
+            $accessToken
+        );
+
+        return EmbeddedSignupResult::fromArray([
+            ...$result->toArray(),
+            'status' => 'completed',
+            'payload' => [
+                ...$result->payload,
+                'oauth' => $token,
+                'state' => $state,
+
+            ],
+
+        ]);
+    }
+
+    /**
      * Provision Embedded Assets
+     *
      * Official Meta Flow:
-     * 
+     *
      * 1. Resolve WABA
      * 2. Fetch WABA
      * 3. Fetch Phones
-     * 4. Fetch Templates
-     * 5. Subscribe App
+     * 4. Subscribe App
+     *
      */
+
     public function provision(string $accessToken, ?string $wabaId = null): EmbeddedSignupResult
     {
         if (!$wabaId && config('waba.embedded.auto_resolve_waba', true)) {
@@ -67,23 +113,16 @@ class EmbeddedSignupService
             );
         }
 
-        $graph = $this->client
-            ->withToken($accessToken);
-
-        $businesses = new BusinessService(
-            $graph
+        $businesses = $this->businesses(
+            $accessToken
         );
 
-        $phones = new PhoneNumberService(
-            $graph
+        $phones = $this->phones(
+            $accessToken
         );
 
-        $templates = new TemplateService(
-            $graph,
-            $this->normalizer
-        );
-
-        $waba = $businesses->waba($wabaId);
+        $waba = $businesses
+            ->waba($wabaId);
 
         $phoneResponse = [];
 
@@ -92,15 +131,12 @@ class EmbeddedSignupService
                 ->all($wabaId);
         }
 
-        $templateResponse = [];
-
-        if (config('waba.embedded.auto_fetch_templates', true)) {
-            $templateResponse = $templates
-                ->all($wabaId);
-        }
-
         $phone = collect(
-            data_get($phoneResponse, 'data', [])
+            data_get(
+                $phoneResponse,
+                'data',
+                []
+            )
         )->first();
 
         if (config('waba.embedded.auto_subscribe_webhook', true)) {
@@ -115,6 +151,10 @@ class EmbeddedSignupService
             'waba_id' => data_get(
                 $waba,
                 'id'
+            ),
+            'waba_name' => data_get(
+                $waba,
+                'name'
             ),
             'business_id' => data_get(
                 $waba,
@@ -132,31 +172,34 @@ class EmbeddedSignupService
                 $phone,
                 'display_phone_number'
             ),
-            'phone_numbers' => data_get(
-                $phoneResponse,
-                'data',
-                []
-            ),
-            'templates' => data_get(
-                $templateResponse,
-                'data',
-                []
-            ),
-            'metadata' => [
-                'embedded_version' => config(
-                    'waba.embedded.version'
+            'payload' => [
+                'waba' => $waba,
+                'phone_numbers' => data_get(
+                    $phoneResponse,
+                    'data',
+                    []
                 ),
-                'api_version' => config(
-                    'waba.meta.api_version'
-                ),
-                'resolved_waba' => true,
+                'metadata' => [
+                    'embedded_version' => config(
+                        'waba.embedded.version'
+                    ),
+                    'api_version' => config(
+                        'waba.meta.api_version'
+                    ),
+                    'resolved_waba' => true,
+                ],
+
             ],
+
         ]);
     }
 
     public function subscribeWebhook(string $wabaId, ?string $accessToken = null): array
     {
-        $client = $accessToken ? $this->client->withToken($accessToken)
+        $client = $accessToken
+            ? $this->client
+            ->withToken($accessToken)
+
             : $this->client
             ->system();
 
@@ -166,5 +209,31 @@ class EmbeddedSignupService
 
         return $subscriber
             ->subscribe($wabaId);
+    }
+
+    protected function graph(string $accessToken): Client
+    {
+        return $this->client
+            ->withToken(
+                $accessToken
+            );
+    }
+
+    protected function businesses(string $accessToken): BusinessService
+    {
+        return new BusinessService(
+            $this->graph(
+                $accessToken
+            )
+        );
+    }
+
+    protected function phones(string $accessToken): PhoneNumberService
+    {
+        return new PhoneNumberService(
+            $this->graph(
+                $accessToken
+            )
+        );
     }
 }
