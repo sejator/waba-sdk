@@ -12,12 +12,8 @@ class WebhookSubscriber
 
     public function subscribe(string $wabaId): array
     {
-
         return $this->client->post(
-            "{$wabaId}/subscribed_apps",
-            [
-                'override_callback_uri' => false,
-            ]
+            "{$wabaId}/subscribed_apps"
         );
     }
 

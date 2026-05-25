@@ -17,11 +17,32 @@ class WabaResolverService
      */
     public function resolveFromAccessToken(string $accessToken): string
     {
+        $appId = config(
+            'waba.meta.app_id'
+        );
+
+        $appSecret = config(
+            'waba.meta.app_secret'
+        );
+
+        if (!$appId || !$appSecret) {
+
+            throw new RuntimeException(
+                'Meta app credentials are not configured.'
+            );
+        }
+
+        $appAccessToken = "{$appId}|{$appSecret}";
+
         $response = $this->client
-            ->system()
-            ->get('/debug_token', [
-                'input_token' => $accessToken,
-            ]);
+            ->withToken($appAccessToken)
+            ->get(
+                '/debug_token',
+                [
+                    'input_token' => $accessToken,
+                    'access_token' => $appAccessToken,
+                ]
+            );
 
         $scopes = data_get(
             $response,
@@ -42,8 +63,27 @@ class WabaResolverService
             );
 
             if (!empty($targetIds[0])) {
-                return $targetIds[0];
+
+                return (string)
+                $targetIds[0];
             }
+        }
+
+        $shared = $this->shared();
+
+        $sharedWaba = collect(
+            data_get(
+                $shared,
+                'data',
+                []
+            )
+        )->first();
+
+        if ($sharedWaba) {
+            return (string) data_get(
+                $sharedWaba,
+                'id'
+            );
         }
 
         throw new RuntimeException(
@@ -55,31 +95,36 @@ class WabaResolverService
     {
         return $this->client
             ->system()
-            ->get(sprintf(
-                '/%s/client_whatsapp_business_accounts',
-                config('waba.meta.business_id')
-            ));
+            ->get(
+                sprintf(
+                    '/%s/client_whatsapp_business_accounts',
+                    config('waba.meta.business_id')
+                )
+            );
     }
 
     public function owned(): array
     {
         return $this->client
             ->system()
-            ->get(sprintf(
-                '/%s/owned_whatsapp_business_accounts',
-                config('waba.meta.business_id')
-            ));
+            ->get(
+                sprintf(
+                    '/%s/owned_whatsapp_business_accounts',
+                    config('waba.meta.business_id')
+                )
+            );
     }
 
-    public function reviewStatus(
-        string $wabaId,
-    ): array {
+    public function reviewStatus(string $wabaId): array
+    {
 
         return $this->client
             ->system()
-            ->get("/{$wabaId}", [
-                'fields' =>
-                'account_review_status',
-            ]);
+            ->get(
+                "/{$wabaId}",
+                [
+                    'fields' => 'account_review_status',
+                ]
+            );
     }
 }
