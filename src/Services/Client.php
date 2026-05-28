@@ -3,6 +3,7 @@
 namespace Sejator\WabaSdk\Services;
 
 use Illuminate\Http\Client\PendingRequest;
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use Sejator\WabaSdk\Exceptions\GraphApiException;
@@ -169,13 +170,32 @@ class Client
             ->retry(
                 config('waba.http.retry.times', 2),
                 config('waba.http.retry.sleep', 500),
-                function ($exception, $request) {
-                    if (!$exception instanceof GraphApiException) {
+
+                function ($exception) {
+
+                    /**
+                     * Connection timeout / DNS / socket error
+                     */
+
+                    if (!$exception instanceof RequestException) {
                         return true;
                     }
 
-                    return $exception->isRetryable();
-                }
+                    $response = $exception->response;
+
+                    if (!$response) {
+                        return true;
+                    }
+
+                    $graphException = GraphApiException::fromResponse(
+                        $response->json(),
+                        $response->status()
+                    );
+
+                    return $graphException->isRetryable();
+                },
+
+                throw: false
             );
 
         if ($this->token) {
