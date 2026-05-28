@@ -4,31 +4,33 @@ namespace Sejator\WabaSdk\Exceptions;
 
 class GraphApiException extends WabaException
 {
-    /*
-    |--------------------------------------------------------------------------
-    | Create From Graph Response
-    |--------------------------------------------------------------------------
-    */
+    public static function fromResponse(array $response, int $status = 502): static
+    {
+        $code = data_get(
+            $response,
+            'error.code'
+        );
 
-    public static function fromResponse(
-        array $response,
-        int $status = 500,
-    ): static {
-
-        return new static(
-
-            message: data_get(
-
-                $response,
-
-                'error.message',
-
-                'Graph API request failed.'
+        return match ($code) {
+            131030 => new RecipientNotAllowedException(
+                message: data_get(
+                    $response,
+                    'error.message',
+                    'Recipient phone number not allowed.'
+                ),
+                status: $status,
+                errors: $response,
             ),
 
-            status: $status,
-
-            errors: $response,
-        );
+            default => new static(
+                message: data_get(
+                    $response,
+                    'error.message',
+                    'Graph API request failed.'
+                ),
+                status: $status,
+                errors: $response,
+            ),
+        };
     }
 }
