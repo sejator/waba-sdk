@@ -147,14 +147,14 @@ class EmbeddedSignupService
             );
         }
 
-        $registration = null;
+        // $registration = null;
 
-        if (config('waba.embedded.auto_register_phone', true) && data_get($phone, 'id')) {
-            $registration = $this->registerPhone(
-                $phones,
-                $phone
-            );
-        }
+        // if (config('waba.embedded.auto_register_phone', true) && data_get($phone, 'id')) {
+        //     $registration = $this->registerPhone(
+        //         $phones,
+        //         $phone
+        //     );
+        // }
 
         return EmbeddedSignupResult::fromArray([
             'access_token' => $accessToken,
@@ -183,7 +183,7 @@ class EmbeddedSignupService
                 'display_phone_number'
             ),
             'webhook_subscription' => $subscription,
-            'phone_registration' => $registration,
+            'phone_registration' => null,
 
             'payload' => [
                 'waba' => $waba,
