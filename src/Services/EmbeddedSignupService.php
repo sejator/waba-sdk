@@ -147,15 +147,6 @@ class EmbeddedSignupService
             );
         }
 
-        // $registration = null;
-
-        // if (config('waba.embedded.auto_register_phone', true) && data_get($phone, 'id')) {
-        //     $registration = $this->registerPhone(
-        //         $phones,
-        //         $phone
-        //     );
-        // }
-
         return EmbeddedSignupResult::fromArray([
             'access_token' => $accessToken,
             'waba_id' => data_get(
@@ -193,7 +184,7 @@ class EmbeddedSignupService
                     []
                 ),
                 'webhook_subscription' => $subscription,
-                'phone_registration' => $registration,
+                'phone_registration' => null,
                 'metadata' => [
                     'embedded_version' => config(
                         'waba.embedded.version'
@@ -226,6 +217,33 @@ class EmbeddedSignupService
             ->subscribe($wabaId);
     }
 
+    public function registerPhone(string $phoneNumberId, string $pin, ?string $accessToken = null): array
+    {
+        $client = $accessToken
+            ? $this->client->withToken($accessToken)
+            : $this->client->system();
+
+        $phones = new PhoneNumberService(
+            $client
+        );
+
+        return $phones->register(
+            $phoneNumberId,
+            $pin,
+        );
+    }
+
+    public function phone(string $phoneNumberId, ?string $accessToken = null): array
+    {
+
+        $client = $accessToken
+            ? $this->client->withToken($accessToken)
+            : $this->client->system();
+
+        return (new PhoneNumberService($client))
+            ->find($phoneNumberId);
+    }
+
     protected function graph(string $accessToken): Client
     {
         return $this->client
@@ -252,45 +270,12 @@ class EmbeddedSignupService
         );
     }
 
-    protected function registerPhone(PhoneNumberService $phones, array $phone): array
+    protected function phoneNumbers(?string $accessToken = null): PhoneNumberService
     {
-        $phoneId = data_get(
-            $phone,
-            'id'
+        return new PhoneNumberService(
+            $accessToken
+                ? $this->client->withToken($accessToken)
+                : $this->client->system()
         );
-
-        if (!$phoneId) {
-            return [
-                'success' => false,
-                'message' => 'Phone number ID missing.',
-            ];
-        }
-
-        if (data_get($phone, 'code_verification_status') === 'VERIFIED') {
-            return [
-                'success' => true,
-                'skipped' => true,
-                'message' => 'Phone already verified.',
-            ];
-        }
-
-        try {
-            $response = $phones->register(
-                $phoneId,
-                config('waba.embedded.default_pin', '123456')
-            );
-
-            return [
-                'success' => true,
-                'response' => $response,
-            ];
-        } catch (\Throwable $e) {
-            report($e);
-
-            return [
-                'success' => false,
-                'message' => $e->getMessage(),
-            ];
-        }
     }
 }
