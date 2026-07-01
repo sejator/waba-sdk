@@ -10,7 +10,6 @@ class TemplateService
     protected array $defaultFields = [
         'id',
         'name',
-        'namespace',
         'language',
         'category',
         'status',
@@ -51,9 +50,10 @@ class TemplateService
 
     public function all(string $wabaId, array $query = []): array
     {
-        $query['limit'] ??= 100;
-
-        $query['fields'] ??= $this->fields();
+        $query = array_merge([
+            'limit'  => 100,
+            'fields' => $this->fields(),
+        ], $query);
 
         return $this->client->get(
             $this->endpoint($wabaId),
@@ -173,11 +173,6 @@ class TemplateService
 
     protected function fields(array $fields = []): string
     {
-        return implode(
-            ',',
-            empty($fields)
-                ? $this->defaultFields
-                : $fields
-        );
+        return implode(',', $fields ?: $this->defaultFields);
     }
 }
