@@ -14,7 +14,6 @@ class TemplateService
         'category',
         'status',
         'quality_score',
-        'quality_rating',
         'review_status',
         'previous_category',
         'components',
