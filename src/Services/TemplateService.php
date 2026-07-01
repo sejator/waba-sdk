@@ -7,6 +7,21 @@ use Sejator\WabaSdk\Support\ComponentNormalizer;
 
 class TemplateService
 {
+    protected array $defaultFields = [
+        'id',
+        'name',
+        'namespace',
+        'language',
+        'category',
+        'status',
+        'quality_score',
+        'quality_rating',
+        'review_status',
+        'previous_category',
+        'components',
+        'parameter_format',
+    ];
+
     public function __construct(
         protected Client $client
     ) {}
@@ -38,6 +53,8 @@ class TemplateService
     {
         $query['limit'] ??= 100;
 
+        $query['fields'] ??= $this->fields();
+
         return $this->client->get(
             $this->endpoint($wabaId),
             $query
@@ -48,7 +65,10 @@ class TemplateService
     {
         return collect(
             data_get(
-                $this->all($wabaId, $query),
+                $this->all(
+                    $wabaId,
+                    $query
+                ),
                 'data',
                 []
             )
@@ -57,25 +77,14 @@ class TemplateService
 
     public function find(string $templateId, array $fields = []): array
     {
-        if (empty($fields)) {
-            $fields = [
-                'id',
-                'name',
-                'language',
-                'status',
-                'category',
-                'quality_score',
-                'components',
-            ];
-        }
+        $fields = empty($fields)
+            ? $this->defaultFields
+            : $fields;
 
         return $this->client->get(
             "/{$templateId}",
             [
-                'fields' => implode(
-                    ',',
-                    $fields
-                ),
+                'fields' => $this->fields($fields),
             ]
         );
     }
@@ -159,6 +168,16 @@ class TemplateService
     {
         return app(ComponentNormalizer::class)->normalize(
             $components
+        );
+    }
+
+    protected function fields(array $fields = []): string
+    {
+        return implode(
+            ',',
+            empty($fields)
+                ? $this->defaultFields
+                : $fields
         );
     }
 }
