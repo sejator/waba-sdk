@@ -7,18 +7,6 @@ use Sejator\WabaSdk\Support\ComponentNormalizer;
 
 class TemplateService
 {
-    protected array $defaultFields = [
-        'id',
-        'name',
-        'language',
-        'category',
-        'status',
-        'quality_score',
-        'review_status',
-        'previous_category',
-        'components',
-        'parameter_format',
-    ];
 
     public function __construct(
         protected Client $client
@@ -49,10 +37,12 @@ class TemplateService
 
     public function all(string $wabaId, array $query = []): array
     {
-        $query = array_merge([
-            'limit'  => 100,
-            'fields' => $this->fields(),
-        ], $query);
+
+        $query['limit'] ??= 100;
+
+        if (!empty($query['fields'])) {
+            $query['fields'] = $this->fields($query['fields']);
+        }
 
         return $this->client->get(
             $this->endpoint($wabaId),
@@ -60,31 +50,18 @@ class TemplateService
         );
     }
 
-    public function collection(string $wabaId, array $query = []): Collection
-    {
-        return collect(
-            data_get(
-                $this->all(
-                    $wabaId,
-                    $query
-                ),
-                'data',
-                []
-            )
-        );
-    }
-
     public function find(string $templateId, array $fields = []): array
     {
-        $fields = empty($fields)
-            ? $this->defaultFields
-            : $fields;
+
+        $query = [];
+
+        if (!empty($fields)) {
+            $query['fields'] = $this->fields($fields);
+        }
 
         return $this->client->get(
             "/{$templateId}",
-            [
-                'fields' => $this->fields($fields),
-            ]
+            $query
         );
     }
 
@@ -163,6 +140,20 @@ class TemplateService
         );
     }
 
+    public function collection(string $wabaId, array $query = []): Collection
+    {
+        return collect(
+            data_get(
+                $this->all(
+                    $wabaId,
+                    $query
+                ),
+                'data',
+                []
+            )
+        );
+    }
+
     protected function normalizeComponents(array $components): array
     {
         return app(ComponentNormalizer::class)->normalize(
@@ -170,8 +161,8 @@ class TemplateService
         );
     }
 
-    protected function fields(array $fields = []): string
+    protected function fields(array $fields): string
     {
-        return implode(',', $fields ?: $this->defaultFields);
+        return implode(',', $fields);
     }
 }
