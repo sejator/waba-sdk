@@ -1,6 +1,9 @@
 <?php
 
+namespace Sejator\WabaSdk\Support\Template;
+
 use Illuminate\Support\Collection;
+use InvalidArgumentException;
 
 trait VariableNormalizer
 {

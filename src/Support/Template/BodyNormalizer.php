@@ -2,8 +2,6 @@
 
 namespace Sejator\WabaSdk\Support\Template;
 
-use VariableNormalizer;
-
 class BodyNormalizer
 {
     use VariableNormalizer;
