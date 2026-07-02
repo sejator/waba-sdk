@@ -1,5 +1,7 @@
 <?php
 
+namespace Sejator\WabaSdk\Support\Template;
+
 class ButtonNormalizer
 {
     public function normalize(array $component): array

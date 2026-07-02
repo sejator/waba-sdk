@@ -1,5 +1,7 @@
 <?php
 
+namespace Sejator\WabaSdk\Support\Template;
+
 class TemplateComponentNormalizer
 {
     public function __construct(

@@ -2,7 +2,7 @@
 
 namespace Sejator\WabaSdk\Support;
 
-use TemplateComponentNormalizer;
+use Sejator\WabaSdk\Support\Template\TemplateComponentNormalizer;
 
 class ComponentNormalizer
 {

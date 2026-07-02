@@ -1,5 +1,9 @@
 <?php
 
+namespace Sejator\WabaSdk\Support\Template;
+
+use VariableNormalizer;
+
 class HeaderNormalizer
 {
     use VariableNormalizer;
