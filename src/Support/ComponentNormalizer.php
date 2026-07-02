@@ -2,46 +2,56 @@
 
 namespace Sejator\WabaSdk\Support;
 
-use Illuminate\Support\Collection;
+use TemplateComponentNormalizer;
 
 class ComponentNormalizer
 {
-    /**
-     * Normalize Template Builder Components
-     */
     public function normalize(array $components): array
     {
-        return collect($components)
-            ->map(fn($component) => $this->normalizeComponent($component))
-            ->values()
-            ->toArray();
+        return app(
+            TemplateComponentNormalizer::class
+        )->normalize($components);
     }
 
-    /**
-     * Normalize Incoming / Outgoing Message Component
-     */
     public function normalizeMessage(
         array $payload,
         array $options = []
     ): ?array {
-
         $type = $payload['type'] ?? null;
 
         return match ($type) {
-            'template' => $this->normalizeTemplate(
+
+            'template' =>
+            $this->normalizeTemplate(
                 $payload,
-                $options['template'] ?? []
+                $options['template'] ?? [],
             ),
-            'image' => $this->normalizeImage($payload),
-            'video' => $this->normalizeVideo($payload),
-            'document' => $this->normalizeDocument($payload),
-            'interactive' => $this->normalizeInteractive($payload),
-            'button' => $this->normalizeButton($payload),
-            'location' => $this->normalizeLocation($payload),
-            'contacts' => $this->normalizeContacts($payload),
+
+            'image' =>
+            $this->normalizeImage($payload),
+
+            'video' =>
+            $this->normalizeVideo($payload),
+
+            'document' =>
+            $this->normalizeDocument($payload),
+
+            'interactive' =>
+            $this->normalizeInteractive($payload),
+
+            'button' =>
+            $this->normalizeButton($payload),
+
+            'location' =>
+            $this->normalizeLocation($payload),
+
+            'contacts' =>
+            $this->normalizeContacts($payload),
+
             default => [],
         };
     }
+
 
     protected function normalizeImage(
         array $payload
@@ -312,114 +322,5 @@ class ComponentNormalizer
                 []
             ),
         ];
-    }
-
-    protected function normalizeComponent(
-        array $component
-    ): array {
-
-        $type = $component['type'] ?? null;
-
-        if (!empty($component['example'])) {
-            return $component;
-        }
-
-        if ($type === 'HEADER') {
-
-            if (($component['format'] ?? null) === 'TEXT') {
-
-                $vars = $this->extractVariables(
-                    $component['text'] ?? ''
-                );
-
-                if ($vars->isNotEmpty()) {
-
-                    $this->validateSequential($vars);
-
-                    $component['example'] = [
-                        'header_text' => $vars
-                            ->map(fn($i) => 'example ' . $i)
-                            ->values()
-                            ->toArray(),
-                    ];
-                }
-            }
-
-            if (($component['format'] ?? null) === 'IMAGE') {
-
-                $handle = data_get(
-                    $component,
-                    'example.header_handle.0'
-                );
-
-                if ($handle) {
-
-                    $component['example'] = [
-                        'header_handle' => [$handle],
-                    ];
-                }
-            }
-        }
-
-        if ($type === 'BODY') {
-
-            $vars = $this->extractVariables(
-                $component['text'] ?? ''
-            );
-
-            if ($vars->isNotEmpty()) {
-
-                $this->validateSequential($vars);
-
-                $component['example'] = [
-                    'body_text' => [
-                        $vars
-                            ->map(fn($i) => 'example ' . $i)
-                            ->values()
-                            ->toArray(),
-                    ],
-                ];
-            }
-        }
-
-        return $component;
-    }
-
-    protected function extractVariables(
-        string $text
-    ): Collection {
-
-        preg_match_all(
-            '/\{\{(\d+)\}\}/',
-            $text,
-            $matches
-        );
-
-        return collect($matches[1])
-            ->map(fn($i) => (int) $i)
-            ->unique()
-            ->sort()
-            ->values();
-    }
-
-    protected function validateSequential(
-        Collection $vars
-    ): void {
-
-        if ($vars->isEmpty()) {
-            return;
-        }
-
-        $expected = range(
-            1,
-            $vars->max()
-        );
-
-        if ($vars->values()->all() !== $expected) {
-
-            throw new \InvalidArgumentException(
-                'Template variables must be sequential ({{1}}, {{2}}, {{3}})'
-            );
-        }
     }
 }
