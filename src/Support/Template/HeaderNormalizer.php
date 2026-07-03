@@ -7,25 +7,47 @@ class HeaderNormalizer
     use VariableNormalizer;
 
     /**
-     * Normalize Header component.
+     * Normalize HEADER component.
      *
      * @param  array<string,mixed>  $component
      * @return array<string,mixed>
      */
-    public function normalize(string $category, array $component): array
-    {
+    public function normalize(
+        string $category,
+        array $component,
+    ): array {
+
+        return match ($category) {
+
+            'AUTHENTICATION' => $this->normalizeAuthentication(
+                $component,
+            ),
+
+            default => $this->normalizeStandard(
+                $component,
+            ),
+        };
+    }
+
+    /**
+     * Normalize HEADER for Marketing & Utility template.
+     *
+     * @param  array<string,mixed>  $component
+     * @return array<string,mixed>
+     */
+    protected function normalizeStandard(
+        array $component,
+    ): array {
 
         return match ($component['format'] ?? null) {
 
             'TEXT' => $this->normalizeText(
-                $category,
                 $component,
             ),
 
             'IMAGE',
             'VIDEO',
             'DOCUMENT' => $this->normalizeMedia(
-                $category,
                 $component,
             ),
 
@@ -34,16 +56,33 @@ class HeaderNormalizer
     }
 
     /**
+     * Normalize HEADER for Authentication template.
+     *
+     * Authentication memiliki aturan Header yang
+     * berbeda dan akan ditambahkan pada refactor
+     * berikutnya.
+     *
+     * @param  array<string,mixed>  $component
+     * @return array<string,mixed>
+     */
+    protected function normalizeAuthentication(
+        array $component,
+    ): array {
+
+        return $this->normalizeStandard(
+            $component,
+        );
+    }
+
+    /**
      * Normalize Text Header.
      *
      * @param  array<string,mixed>  $component
      * @return array<string,mixed>
      */
-    protected function normalizeText(string $category, array $component): array
-    {
-
-        // Reserved for future Authentication Header rules.
-        unset($category);
+    protected function normalizeText(
+        array $component,
+    ): array {
 
         if (!empty($component['example']['header_text'])) {
             return $component;
@@ -70,11 +109,9 @@ class HeaderNormalizer
      * @param  array<string,mixed>  $component
      * @return array<string,mixed>
      */
-    protected function normalizeMedia(string $category, array $component): array
-    {
-
-        // Reserved for future Authentication Header rules.
-        unset($category);
+    protected function normalizeMedia(
+        array $component,
+    ): array {
 
         $handle = data_get(
             $component,

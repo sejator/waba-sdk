@@ -9,11 +9,13 @@ class ButtonNormalizer
     /**
      * Normalize BUTTONS component.
      *
-     * @param array<string,mixed> $component
+     * @param  array<string,mixed>  $component
      * @return array<string,mixed>
      */
-    public function normalize(string $category, array $component): array
-    {
+    public function normalize(
+        string $category,
+        array $component,
+    ): array {
 
         $component['buttons'] = collect(
             $component['buttons'] ?? [],
@@ -34,11 +36,13 @@ class ButtonNormalizer
     /**
      * Normalize single button.
      *
-     * @param array<string,mixed> $button
+     * @param  array<string,mixed>  $button
      * @return array<string,mixed>|null
      */
-    protected function normalizeButton(string $category, array $button): ?array
-    {
+    protected function normalizeButton(
+        string $category,
+        array $button,
+    ): ?array {
 
         return match ($button['type'] ?? null) {
 
@@ -72,27 +76,27 @@ class ButtonNormalizer
     }
 
     /**
-     * URL Button.
+     * Normalize URL button.
      *
-     * @param array<string,mixed> $button
+     * @param  array<string,mixed>  $button
      * @return array<string,mixed>
      */
-    protected function url(string $category, array $button): array
-    {
-
-        unset($category);
+    protected function url(
+        string $category,
+        array $button,
+    ): array {
 
         $payload = [
             'type' => 'URL',
-            'text' => $button['text'] ?? '',
-            'url'  => $button['url'] ?? '',
+            'text' => $this->sanitizeButtonText(
+                $button['text'] ?? '',
+            ),
+            'url' => $button['url'] ?? '',
         ];
 
-        /*
-        |--------------------------------------------------------------------------
-        | Dynamic URL Example
-        |--------------------------------------------------------------------------
-        */
+        if ($category === 'AUTHENTICATION') {
+            return $payload;
+        }
 
         if (!empty($button['example'])) {
 
@@ -118,72 +122,154 @@ class ButtonNormalizer
     }
 
     /**
-     * Phone Button.
+     * Normalize Phone button.
      *
-     * @param array<string,mixed> $button
+     * @param  array<string,mixed>  $button
      * @return array<string,mixed>
      */
-    protected function phone(string $category, array $button): array
-    {
-
-        unset($category);
+    protected function phone(
+        string $category,
+        array $button,
+    ): array {
 
         return [
             'type' => 'PHONE_NUMBER',
-            'text' => $button['text'] ?? '',
+            'text' => $this->sanitizeButtonText(
+                $button['text'] ?? '',
+            ),
             'phone_number' => $button['phone_number'] ?? '',
         ];
     }
 
     /**
-     * Quick Reply Button.
+     * Normalize Quick Reply button.
      *
-     * @param array<string,mixed> $button
+     * @param  array<string,mixed>  $button
      * @return array<string,mixed>
      */
-    protected function quickReply(string $category, array $button): array
-    {
-
-        unset($category);
+    protected function quickReply(
+        string $category,
+        array $button,
+    ): array {
 
         return [
             'type' => 'QUICK_REPLY',
-            'text' => $button['text'] ?? '',
+            'text' => $this->sanitizeButtonText(
+                $button['text'] ?? '',
+            ),
         ];
     }
 
     /**
-     * Copy Code Button.
+     * Normalize Copy Code button.
      *
-     * @param array<string,mixed> $button
+     * Authentication menggunakan OTP Button.
+     *
+     * @param  array<string,mixed>  $button
      * @return array<string,mixed>
      */
-    protected function copyCode(string $category, array $button): array
-    {
+    protected function copyCode(
+        string $category,
+        array $button,
+    ): array {
 
-        unset($category);
+        $text = $this->sanitizeButtonText(
+            $button['text'] ?? 'Copy Code',
+        );
+
+        if ($text === '') {
+            $text = 'Copy Code';
+        }
+
+        if ($category === 'AUTHENTICATION') {
+
+            return [
+                'type' => 'OTP',
+                'otp_type' => 'COPY_CODE',
+                'text' => $text,
+            ];
+        }
 
         return [
             'type' => 'COPY_CODE',
-            'text' => $button['text'] ?? '',
+            'text' => $text,
             'example' => $button['example'] ?? '',
         ];
     }
 
     /**
-     * Voice Call Button.
+     * Normalize Voice Call button.
      *
-     * @param array<string,mixed> $button
+     * @param  array<string,mixed>  $button
      * @return array<string,mixed>
      */
-    protected function voiceCall(string $category, array $button): array
-    {
-
-        unset($category);
+    protected function voiceCall(
+        string $category,
+        array $button,
+    ): array {
 
         return [
             'type' => 'VOICE_CALL',
-            'text' => $button['text'] ?? '',
+            'text' => $this->sanitizeButtonText(
+                $button['text'] ?? '',
+            ),
         ];
+    }
+
+    /**
+     * Remove unsupported characters from button text.
+     *
+     * Meta tidak mengizinkan:
+     * - Variable
+     * - Markdown
+     * - Emoji
+     * - New line
+     * - Karakter khusus
+     */
+    protected function sanitizeButtonText(
+        string $text,
+    ): string {
+
+        // Remove variables
+        $text = preg_replace(
+            '/\{\{\d+\}\}/',
+            '',
+            $text,
+        );
+
+        // Remove markdown characters
+        $text = str_replace(
+            [
+                '*',
+                '_',
+                '~',
+                '`',
+            ],
+            '',
+            $text,
+        );
+
+        // Remove new line
+        $text = preg_replace(
+            '/[\r\n]+/',
+            ' ',
+            $text,
+        );
+
+        // Keep only letters, numbers and spaces
+        $text = preg_replace(
+            '/[^\p{L}\p{N}\s]/u',
+            '',
+            $text,
+        );
+
+        // Normalize spaces
+        $text = preg_replace(
+            '/\s+/',
+            ' ',
+            $text,
+        );
+
+        return trim($text);
     }
 }

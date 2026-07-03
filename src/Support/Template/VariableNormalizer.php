@@ -8,14 +8,12 @@ use InvalidArgumentException;
 trait VariableNormalizer
 {
     /**
-     * Ambil seluruh nomor variable.
-     *
-     * "{{1}} {{2}}"
-     * =>
-     * collect([1,2])
+     * Extract variable numbers.
      */
-    protected function variables(string $text): Collection
-    {
+    protected function variables(
+        string $text,
+    ): Collection {
+
         preg_match_all(
             '/\{\{(\d+)\}\}/',
             $text,
@@ -24,7 +22,7 @@ trait VariableNormalizer
 
         return collect($matches[1])
             ->map(
-                fn(string $value) => (int) $value,
+                fn (string $value) => (int) $value,
             )
             ->unique()
             ->sort()
@@ -32,32 +30,22 @@ trait VariableNormalizer
     }
 
     /**
-     * Apakah text memiliki variable.
+     * Determine whether text contains variables.
      */
-    protected function hasVariables(string $text): bool
-    {
+    protected function hasVariables(
+        string $text,
+    ): bool {
 
         return $this->variables($text)
             ->isNotEmpty();
     }
 
     /**
-     * Validasi urutan variable.
-     *
-     * {{1}}{{2}}{{3}}
-     *
-     * valid
-     *
-     * {{1}}{{3}}
-     *
-     * invalid
+     * Ensure variables are sequential.
      */
-    protected function validateVariables(string $text): void
-    {
-
-        $variables = $this->variables(
-            $text,
-        );
+    protected function validateVariables(
+        Collection $variables,
+    ): void {
 
         if ($variables->isEmpty()) {
             return;
@@ -70,11 +58,7 @@ trait VariableNormalizer
             ),
         );
 
-        if (
-            !$variables->values()->equals(
-                $expected,
-            )
-        ) {
+        if (!$variables->equals($expected)) {
             throw new InvalidArgumentException(
                 'Template variables must be sequential.',
             );
@@ -82,31 +66,24 @@ trait VariableNormalizer
     }
 
     /**
-     * Menghasilkan example default.
-     *
-     * {{1}}{{2}}
-     *
-     * =>
-     *
-     * [
-     *     "example 1",
-     *     "example 2",
-     * ]
+     * Generate default variable examples.
      */
-    protected function variableExamples(string $text): array
-    {
+    protected function variableExamples(
+        string $text,
+    ): array {
 
-        $this->validateVariables(
+        $variables = $this->variables(
             $text,
         );
 
-        return $this->variables(
-            $text,
-        )
+        $this->validateVariables(
+            $variables,
+        );
+
+        return $variables
             ->map(
-                fn(int $index) => "example {$index}",
+                fn (int $index) => "example {$index}",
             )
-            ->values()
             ->all();
     }
 }

@@ -9,11 +9,13 @@ class BodyNormalizer
     /**
      * Normalize BODY component.
      *
-     * @param array<string,mixed> $component
+     * @param  array<string,mixed>  $component
      * @return array<string,mixed>
      */
-    public function normalize(string $category, array $component): array
-    {
+    public function normalize(
+        string $category,
+        array $component,
+    ): array {
 
         return match ($category) {
 
@@ -28,13 +30,14 @@ class BodyNormalizer
     }
 
     /**
-     * Normalize BODY for Utility & Marketing.
+     * Normalize BODY for Marketing & Utility template.
      *
-     * @param array<string,mixed> $component
+     * @param  array<string,mixed>  $component
      * @return array<string,mixed>
      */
-    protected function normalizeStandard(array $component): array
-    {
+    protected function normalizeStandard(
+        array $component,
+    ): array {
 
         if (!empty($component['example']['body_text'])) {
             return $component;
@@ -58,19 +61,37 @@ class BodyNormalizer
     }
 
     /**
-     * Normalize BODY for Authentication Template.
+     * Normalize BODY for Authentication template.
      *
-     * Authentication memiliki aturan khusus yang akan
-     * ditambahkan pada refactor berikutnya.
+     * Authentication template memiliki struktur BODY
+     * yang berbeda dengan Marketing/Utility.
+     * Untuk sementara tetap menggunakan normalisasi
+     * standar sampai seluruh rule Authentication
+     * selesai diimplementasikan.
      *
-     * @param array<string,mixed> $component
+     * @param  array<string,mixed>  $component
      * @return array<string,mixed>
      */
-    protected function normalizeAuthentication(array $component): array
-    {
+    protected function normalizeAuthentication(
+        array $component,
+    ): array {
 
-        return $this->normalizeStandard(
+        $component = $this->normalizeStandard(
             $component,
         );
+
+        /*
+        |--------------------------------------------------------------------------
+        | Authentication Rules
+        |--------------------------------------------------------------------------
+        |
+        | Placeholder untuk implementasi:
+        | - add_security_recommendation
+        | - code_expiration_minutes
+        | - zero-tap / copy-code
+        |
+        */
+
+        return $component;
     }
 }
