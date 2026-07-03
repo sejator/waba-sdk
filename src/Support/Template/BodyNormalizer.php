@@ -6,28 +6,71 @@ class BodyNormalizer
 {
     use VariableNormalizer;
 
-    public function normalize(array $component): array
+    /**
+     * Normalize BODY component.
+     *
+     * @param array<string,mixed> $component
+     * @return array<string,mixed>
+     */
+    public function normalize(string $category, array $component): array
     {
-        if (!empty($component['example'])) {
+
+        return match ($category) {
+
+            'AUTHENTICATION' => $this->normalizeAuthentication(
+                $component,
+            ),
+
+            default => $this->normalizeStandard(
+                $component,
+            ),
+        };
+    }
+
+    /**
+     * Normalize BODY for Utility & Marketing.
+     *
+     * @param array<string,mixed> $component
+     * @return array<string,mixed>
+     */
+    protected function normalizeStandard(array $component): array
+    {
+
+        if (!empty($component['example']['body_text'])) {
             return $component;
         }
 
-        $vars = $this->variables(
-            $component['text'] ?? ''
+        $examples = $this->variableExamples(
+            $component['text'] ?? '',
         );
 
-        if ($vars->isEmpty()) {
+        if ($examples === []) {
             return $component;
         }
 
         $component['example'] = [
             'body_text' => [
-                $vars
-                    ->map(fn($i) => "example {$i}")
-                    ->all(),
+                $examples,
             ],
         ];
 
         return $component;
+    }
+
+    /**
+     * Normalize BODY for Authentication Template.
+     *
+     * Authentication memiliki aturan khusus yang akan
+     * ditambahkan pada refactor berikutnya.
+     *
+     * @param array<string,mixed> $component
+     * @return array<string,mixed>
+     */
+    protected function normalizeAuthentication(array $component): array
+    {
+
+        return $this->normalizeStandard(
+            $component,
+        );
     }
 }

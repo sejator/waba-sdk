@@ -6,57 +6,90 @@ class HeaderNormalizer
 {
     use VariableNormalizer;
 
-    public function normalize(array $component): array
+    /**
+     * Normalize Header component.
+     *
+     * @param  array<string,mixed>  $component
+     * @return array<string,mixed>
+     */
+    public function normalize(string $category, array $component): array
     {
-        if (!empty($component['example'])) {
-            return $component;
-        }
 
         return match ($component['format'] ?? null) {
 
-            'TEXT' => $this->normalizeText($component),
+            'TEXT' => $this->normalizeText(
+                $category,
+                $component,
+            ),
 
             'IMAGE',
             'VIDEO',
-            'DOCUMENT'
-            => $this->normalizeMedia($component),
+            'DOCUMENT' => $this->normalizeMedia(
+                $category,
+                $component,
+            ),
 
             default => $component,
         };
     }
 
-    protected function normalizeText(array $component): array
+    /**
+     * Normalize Text Header.
+     *
+     * @param  array<string,mixed>  $component
+     * @return array<string,mixed>
+     */
+    protected function normalizeText(string $category, array $component): array
     {
-        $vars = $this->variables(
-            $component['text'] ?? ''
+
+        // Reserved for future Authentication Header rules.
+        unset($category);
+
+        if (!empty($component['example']['header_text'])) {
+            return $component;
+        }
+
+        $examples = $this->variableExamples(
+            $component['text'] ?? '',
         );
 
-        if ($vars->isEmpty()) {
+        if ($examples === []) {
             return $component;
         }
 
         $component['example'] = [
-            'header_text' => $vars
-                ->map(fn($i) => "example {$i}")
-                ->all(),
+            'header_text' => $examples,
         ];
 
         return $component;
     }
 
-    protected function normalizeMedia(array $component): array
+    /**
+     * Normalize Media Header.
+     *
+     * @param  array<string,mixed>  $component
+     * @return array<string,mixed>
+     */
+    protected function normalizeMedia(string $category, array $component): array
     {
+
+        // Reserved for future Authentication Header rules.
+        unset($category);
+
         $handle = data_get(
             $component,
-            'example.header_handle.0'
+            'example.header_handle.0',
         );
 
-        if ($handle) {
-
-            $component['example'] = [
-                'header_handle' => [$handle],
-            ];
+        if (!$handle) {
+            return $component;
         }
+
+        $component['example'] = [
+            'header_handle' => [
+                $handle,
+            ],
+        ];
 
         return $component;
     }

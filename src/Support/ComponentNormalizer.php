@@ -6,56 +6,55 @@ use Sejator\WabaSdk\Support\Template\TemplateComponentNormalizer;
 
 class ComponentNormalizer
 {
-    public function normalize(array $components): array
+    /**
+     * Normalize WhatsApp Template Components.
+     */
+    public function normalize(string $category, array $components): array
     {
+
         return app(
-            TemplateComponentNormalizer::class
-        )->normalize($components);
+            TemplateComponentNormalizer::class,
+        )->normalize(
+            $category,
+            $components,
+        );
     }
 
-    public function normalizeMessage(
-        array $payload,
-        array $options = []
-    ): ?array {
+    /**
+     * Normalize Incoming Message Payload.
+     */
+    public function normalizeMessage(array $payload, array $options = []): ?array
+    {
+
         $type = $payload['type'] ?? null;
 
         return match ($type) {
 
-            'template' =>
-            $this->normalizeTemplate(
+            'template' => $this->normalizeTemplate(
                 $payload,
                 $options['template'] ?? [],
             ),
 
-            'image' =>
-            $this->normalizeImage($payload),
+            'image' => $this->normalizeImage($payload),
 
-            'video' =>
-            $this->normalizeVideo($payload),
+            'video' => $this->normalizeVideo($payload),
 
-            'document' =>
-            $this->normalizeDocument($payload),
+            'document' => $this->normalizeDocument($payload),
 
-            'interactive' =>
-            $this->normalizeInteractive($payload),
+            'interactive' => $this->normalizeInteractive($payload),
 
-            'button' =>
-            $this->normalizeButton($payload),
+            'button' => $this->normalizeButton($payload),
 
-            'location' =>
-            $this->normalizeLocation($payload),
+            'location' => $this->normalizeLocation($payload),
 
-            'contacts' =>
-            $this->normalizeContacts($payload),
+            'contacts' => $this->normalizeContacts($payload),
 
             default => [],
         };
     }
 
-
-    protected function normalizeImage(
-        array $payload
-    ): array {
+    protected function normalizeImage(array $payload): array
+    {
 
         $image = $payload['image'] ?? [];
 
@@ -65,9 +64,8 @@ class ComponentNormalizer
         ];
     }
 
-    protected function normalizeVideo(
-        array $payload
-    ): array {
+    protected function normalizeVideo(array $payload): array
+    {
 
         $video = $payload['video'] ?? [];
 
@@ -77,9 +75,8 @@ class ComponentNormalizer
         ];
     }
 
-    protected function normalizeDocument(
-        array $payload
-    ): array {
+    protected function normalizeDocument(array $payload): array
+    {
 
         $document = $payload['document'] ?? [];
 
@@ -90,20 +87,18 @@ class ComponentNormalizer
         ];
     }
 
-    protected function normalizeInteractive(
-        array $payload
-    ): array {
+    protected function normalizeInteractive(array $payload): array
+    {
 
         $interactive = $payload['interactive'] ?? [];
 
         $type = $interactive['type'] ?? null;
 
-        if (
-            in_array(
-                $type,
-                ['button_reply', 'list_reply']
-            )
-        ) {
+        if (in_array(
+            $type,
+            ['button_reply', 'list_reply'],
+            true,
+        )) {
 
             $reply = $interactive[$type] ?? [];
 
@@ -120,69 +115,68 @@ class ComponentNormalizer
             'header' => $interactive['header'] ?? null,
             'body' => data_get(
                 $interactive,
-                'body.text'
+                'body.text',
             ),
             'footer' => data_get(
                 $interactive,
-                'footer.text'
+                'footer.text',
             ),
             'button' => data_get(
                 $interactive,
-                'action.button'
+                'action.button',
             ),
             'buttons' => collect(
                 data_get(
                     $interactive,
                     'action.buttons',
-                    []
-                )
+                    [],
+                ),
             )
                 ->map(fn($button) => [
                     'id' => data_get(
                         $button,
-                        'reply.id'
+                        'reply.id',
                     ),
-
                     'title' => data_get(
                         $button,
-                        'reply.title'
+                        'reply.title',
                     ),
                 ])
                 ->values()
-                ->toArray(),
+                ->all(),
 
             'sections' => data_get(
                 $interactive,
-                'action.sections'
+                'action.sections',
             ),
         ];
     }
 
-    protected function normalizeTemplate(
-        array $payload,
-        array $templateMeta = []
-    ): array {
+    protected function normalizeTemplate(array $payload, array $templateMeta = []): array
+    {
 
         $template = $payload['template'] ?? [];
 
         $components = collect(
-            $template['components'] ?? []
+            $template['components'] ?? [],
         );
 
         $footer = $templateMeta['footer'] ?? null;
+
         $templateButtons = $templateMeta['buttons'] ?? [];
 
         $header = null;
+
         $body = [];
-        $buttons = [];
 
         foreach ($components as $component) {
 
             $componentType = strtolower(
-                $component['type'] ?? ''
+                $component['type'] ?? '',
             );
 
             if ($componentType === 'header') {
+
                 $parameter = $component['parameters'][0] ?? null;
 
                 if ($parameter) {
@@ -191,19 +185,19 @@ class ComponentNormalizer
                         'type' => $parameter['type'] ?? null,
                         'image' => data_get(
                             $parameter,
-                            'image.link'
+                            'image.link',
                         ),
                         'video' => data_get(
                             $parameter,
-                            'video.link'
+                            'video.link',
                         ),
                         'document' => data_get(
                             $parameter,
-                            'document.link'
+                            'document.link',
                         ),
                         'text' => data_get(
                             $parameter,
-                            'text'
+                            'text',
                         ),
                     ];
                 }
@@ -212,14 +206,14 @@ class ComponentNormalizer
             if ($componentType === 'body') {
 
                 $body = collect(
-                    $component['parameters'] ?? []
+                    $component['parameters'] ?? [],
                 )
                     ->map(fn($parameter) => [
                         'type' => $parameter['type'] ?? null,
                         'text' => $parameter['text'] ?? null,
                     ])
                     ->values()
-                    ->toArray();
+                    ->all();
             }
         }
 
@@ -232,19 +226,19 @@ class ComponentNormalizer
                 $parameter = data_get(
                     $runtimeButton,
                     'parameters.0',
-                    []
+                    [],
                 );
 
                 return [
                     'type' => $button['type'] ?? null,
                     'text' => $button['text'] ?? null,
                     'sub_type' => strtolower(
-                        $button['type'] ?? ''
+                        $button['type'] ?? '',
                     ),
                     'index' => $index,
                     'value' => data_get(
                         $parameter,
-                        'text'
+                        'text',
                     ),
                     'url' => $button['url'] ?? null,
                     'phone_number' => $button['phone_number'] ?? null,
@@ -252,14 +246,14 @@ class ComponentNormalizer
                 ];
             })
             ->values()
-            ->toArray();
+            ->all();
 
         return [
             'type' => 'template',
             'name' => $template['name'] ?? null,
             'language' => data_get(
                 $template,
-                'language.code'
+                'language.code',
             ),
             'header' => $header,
             'body' => $body,
@@ -268,58 +262,55 @@ class ComponentNormalizer
         ];
     }
 
-    protected function normalizeButton(
-        array $payload
-    ): array {
+    protected function normalizeButton(array $payload): array
+    {
 
         return [
             'type' => 'button',
             'text' => data_get(
                 $payload,
-                'button.text'
+                'button.text',
             ),
             'payload' => data_get(
                 $payload,
-                'button.payload'
+                'button.payload',
             ),
         ];
     }
 
-    protected function normalizeLocation(
-        array $payload
-    ): array {
+    protected function normalizeLocation(array $payload): array
+    {
 
         return [
             'type' => 'location',
             'name' => data_get(
                 $payload,
-                'location.name'
+                'location.name',
             ),
             'address' => data_get(
                 $payload,
-                'location.address'
+                'location.address',
             ),
             'latitude' => data_get(
                 $payload,
-                'location.latitude'
+                'location.latitude',
             ),
             'longitude' => data_get(
                 $payload,
-                'location.longitude'
+                'location.longitude',
             ),
         ];
     }
 
-    protected function normalizeContacts(
-        array $payload
-    ): array {
+    protected function normalizeContacts(array $payload): array
+    {
 
         return [
             'type' => 'contacts',
             'contacts' => data_get(
                 $payload,
                 'contacts',
-                []
+                [],
             ),
         ];
     }
