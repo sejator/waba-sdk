@@ -15,13 +15,19 @@ class Client
         protected ?string $token = null,
     ) {}
 
+    /*
+    |--------------------------------------------------------------------------
+    | HTTP Methods
+    |--------------------------------------------------------------------------
+    */
+
     public function get(string $uri, array $query = []): array
     {
         return $this->handle(
             $this->http()->get(
                 $this->url($uri),
-                $query
-            )
+                $query,
+            ),
         );
     }
 
@@ -30,28 +36,8 @@ class Client
         return $this->handle(
             $this->http()->post(
                 $this->url($uri),
-                $payload
-            )
-        );
-    }
-
-    public function delete(string $uri, array $payload = []): array
-    {
-        return $this->handle(
-            $this->http()->delete(
-                $this->url($uri),
-                $payload
-            )
-        );
-    }
-
-    public function patch(string $uri, array $payload = []): array
-    {
-        return $this->handle(
-            $this->http()->patch(
-                $this->url($uri),
-                $payload
-            )
+                $payload,
+            ),
         );
     }
 
@@ -60,8 +46,28 @@ class Client
         return $this->handle(
             $this->http()->put(
                 $this->url($uri),
-                $payload
-            )
+                $payload,
+            ),
+        );
+    }
+
+    public function patch(string $uri, array $payload = []): array
+    {
+        return $this->handle(
+            $this->http()->patch(
+                $this->url($uri),
+                $payload,
+            ),
+        );
+    }
+
+    public function delete(string $uri, array $payload = []): array
+    {
+        return $this->handle(
+            $this->http()->delete(
+                $this->url($uri),
+                $payload,
+            ),
         );
     }
 
@@ -73,8 +79,8 @@ class Client
                     'query' => $query,
                 ])
                 ->post(
-                    $this->url($uri)
-                )
+                    $this->url($uri),
+                ),
         );
     }
 
@@ -83,20 +89,27 @@ class Client
         $http = $this->http();
 
         foreach ($multipart as $part) {
+
             $http = $http->attach(
                 $part['name'],
                 $part['contents'],
                 $part['filename'] ?? null,
-                $part['headers'] ?? []
+                $part['headers'] ?? [],
             );
         }
 
         return $this->handle(
             $http->post(
-                $this->url($uri)
-            )
+                $this->url($uri),
+            ),
         );
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Binary Upload
+    |--------------------------------------------------------------------------
+    */
 
     public function uploadBinary(string $uploadId, string $binary, int $offset = 0): array
     {
@@ -111,24 +124,30 @@ class Client
                     $this->url($uploadId),
                     [
                         'body' => $binary,
-                    ]
-                )
+                    ],
+                ),
         );
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | Raw Download
+    |--------------------------------------------------------------------------
+    */
+
     public function getRaw(string $url): string
     {
-        $response = $this->http()
-            ->get($url);
+        $response = $this->http()->get($url);
 
         if ($response->successful()) {
-
             return $response->body();
         }
 
+        $this->logFailedResponse($response);
+
         throw GraphApiException::fromResponse(
             $response->json(),
-            $response->status()
+            $response->status(),
         );
     }
 
@@ -143,16 +162,22 @@ class Client
     {
         return new static(
             $this->baseUrl,
-            $token
+            $token,
         );
     }
 
     public function system(): static
     {
         return $this->withToken(
-            config('waba.meta.system_user_token')
+            config('waba.meta.system_user_token'),
         );
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | HTTP Client
+    |--------------------------------------------------------------------------
+    */
 
     protected function http(): PendingRequest
     {
@@ -162,10 +187,10 @@ class Client
                 'X-Request-ID' => (string) str()->uuid(),
             ])
             ->timeout(
-                config('waba.http.timeout', 30)
+                config('waba.http.timeout', 30),
             )
             ->connectTimeout(
-                config('waba.http.connect_timeout', 10)
+                config('waba.http.connect_timeout', 10),
             )
             ->retry(
                 config('waba.http.retry.times', 2),
@@ -173,50 +198,37 @@ class Client
 
                 function ($exception) {
 
-                    /**
-                     * Connection timeout / DNS / socket error
-                     */
-
-                    if (!$exception instanceof RequestException) {
+                    if (! $exception instanceof RequestException) {
                         return true;
                     }
 
-                    $response = $exception->response;
-
-                    if (!$response) {
+                    if (! $exception->response) {
                         return true;
                     }
 
-                    $graphException = GraphApiException::fromResponse(
-                        $response->json(),
-                        $response->status()
-                    );
-
-                    return $graphException->isRetryable();
+                    return GraphApiException::fromResponse(
+                        $exception->response->json(),
+                        $exception->response->status(),
+                    )->isRetryable();
                 },
 
-                throw: false
+                throw: false,
             );
 
         if ($this->token) {
             $http = $http->withToken(
-                $this->token
+                $this->token,
             );
         }
 
         return $http;
     }
 
-    protected function url(string $uri): string
-    {
-        return rtrim(
-            $this->baseUrl,
-            '/'
-        ) . '/' . ltrim(
-            $uri,
-            '/'
-        );
-    }
+    /*
+    |--------------------------------------------------------------------------
+    | Response
+    |--------------------------------------------------------------------------
+    */
 
     protected function handle(Response $response): array
     {
@@ -225,11 +237,53 @@ class Client
             return $response->json() ?? [];
         }
 
-        $json = $response->json();
+        $this->logFailedResponse(
+            $response,
+        );
 
         throw GraphApiException::fromResponse(
-            $json,
-            $response->status()
+            $response->json(),
+            $response->status(),
+        );
+    }
+
+    protected function logFailedResponse(Response $response): void
+    {
+        $request = $response->transferStats?->getRequest();
+
+        logger()->error(
+            'Meta Graph API Error',
+            [
+                'method' => $request?->getMethod(),
+                'url' => (string) $request?->getUri(),
+                'status' => $response->status(),
+                'request_id' => $response->header(
+                    'x-fb-request-id',
+                ),
+                'trace_id' => data_get(
+                    $response->json(),
+                    'error.fbtrace_id',
+                ),
+                'response' => $response->json(),
+                'raw' => $response->body(),
+            ],
+        );
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Helpers
+    |--------------------------------------------------------------------------
+    */
+
+    protected function url(string $uri): string
+    {
+        return rtrim(
+            $this->baseUrl,
+            '/',
+        ) . '/' . ltrim(
+            $uri,
+            '/',
         );
     }
 }
