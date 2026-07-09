@@ -19,16 +19,12 @@ class IncomingMessageNormalizer
 
         return new NormalizedMessage(
             type: $type,
-            body: $this->extractBody(
-                $message,
-                $type
-            ),
-            mediaId: $this->extractMediaId(
-                $message,
-                $type
-            ),
-            component: $this->componentNormalizer
-                ->normalizeMessage($message),
+            body: $this->extractBody($message, $type),
+            mediaId: $this->extractMediaId($message, $type),
+            mediaUrl: $this->extractMediaUrl($message, $type),
+            mimeType: $this->extractMimeType($message, $type),
+            filename: $this->extractFilename($message, $type),
+            component: $this->componentNormalizer->normalizeMessage($message),
             payload: $message,
         );
     }
@@ -64,6 +60,36 @@ class IncomingMessageNormalizer
             MessageType::AUDIO => Arr::get($message, 'audio.id'),
             MessageType::DOCUMENT => Arr::get($message, 'document.id'),
             MessageType::STICKER => Arr::get($message, 'sticker.id'),
+            default => null,
+        };
+    }
+
+    protected function extractMediaUrl(array $message, string $type): ?string
+    {
+        return match ($type) {
+            MessageType::IMAGE => data_get($message, 'image.link'),
+            MessageType::VIDEO => data_get($message, 'video.link'),
+            MessageType::DOCUMENT => data_get($message, 'document.link'),
+            MessageType::AUDIO => data_get($message, 'audio.link'),
+            default => null,
+        };
+    }
+
+    protected function extractMimeType(array $message, string $type): ?string
+    {
+        return match ($type) {
+            MessageType::IMAGE => data_get($message, 'image.mime_type'),
+            MessageType::VIDEO => data_get($message, 'video.mime_type'),
+            MessageType::DOCUMENT => data_get($message, 'document.mime_type'),
+            MessageType::AUDIO => data_get($message, 'audio.mime_type'),
+            default => null,
+        };
+    }
+
+    protected function extractFilename(array $message, string $type): ?string
+    {
+        return match ($type) {
+            MessageType::DOCUMENT => data_get($message, 'document.filename'),
             default => null,
         };
     }
