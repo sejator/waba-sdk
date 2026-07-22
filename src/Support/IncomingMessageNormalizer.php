@@ -47,6 +47,7 @@ class IncomingMessageNormalizer
             MessageType::LOCATION => '[Location]',
             MessageType::CONTACTS => '[Contact]',
             MessageType::TEMPLATE => '[Template]',
+            MessageType::UNKNOWN => '[Unsupported message]',
 
             default => null,
         };
