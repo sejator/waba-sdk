@@ -163,7 +163,12 @@ class ButtonNormalizer
     /**
      * Normalize Copy Code button.
      *
-     * Authentication menggunakan OTP Button.
+     * Meta memaksa teks tombol COPY_CODE tetap (tidak bisa dikustomisasi)
+     * untuk SEMUA kategori, bukan cuma AUTHENTICATION - dikonfirmasi
+     * langsung dari API: "Text for button type \"COPY_CODE\" cannot be
+     * modified and must always be ..." (terlokalisasi sesuai bahasa
+     * template, mis. "Salin kode tawaran" untuk id). Jangan kirim `text`
+     * untuk tipe tombol ini di kategori manapun.
      *
      * @param  array<string,mixed>  $button
      * @return array<string,mixed>
@@ -173,26 +178,16 @@ class ButtonNormalizer
         array $button,
     ): array {
 
-        $text = $this->sanitizeButtonText(
-            $button['text'] ?? 'Copy Code',
-        );
-
-        if ($text === '') {
-            $text = 'Copy Code';
-        }
-
         if ($category === 'AUTHENTICATION') {
 
             return [
                 'type' => 'OTP',
                 'otp_type' => 'COPY_CODE',
-                'text' => $text,
             ];
         }
 
         return [
             'type' => 'COPY_CODE',
-            'text' => $text,
             'example' => $button['example'] ?? '',
         ];
     }

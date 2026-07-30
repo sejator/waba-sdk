@@ -43,6 +43,34 @@ class TemplateService
     }
 
     /**
+     * Edit an existing template.
+     *
+     * Endpoint reference: WhatsApp Message Template
+     * (https://developers.facebook.com/docs/graph-api/reference/whats-app-business-hsm/).
+     * Meta re-reviews the template after a successful edit, so any prior
+     * APPROVED/REJECTED status resets to PENDING on their side. Response is
+     * `{"success": true}` only - no template data is returned.
+     *
+     * @param array<string,mixed> $payload
+     */
+    public function edit(string $templateId, array $payload): array
+    {
+
+        if (!empty($payload['components'])) {
+
+            $payload['components'] = $this->normalizeComponents(
+                $payload['category'] ?? 'UTILITY',
+                $payload['components'],
+            );
+        }
+
+        return $this->client->post(
+            "/{$templateId}",
+            $payload,
+        );
+    }
+
+    /**
      * Get all templates.
      */
     public function all(string $wabaId, array $query = []): array

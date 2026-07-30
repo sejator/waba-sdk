@@ -58,7 +58,7 @@ trait VariableNormalizer
             ),
         );
 
-        if (!$variables->equals($expected)) {
+        if ($variables->values()->all() !== $expected->values()->all()) {
             throw new InvalidArgumentException(
                 'Template variables must be sequential.',
             );
