@@ -21,6 +21,13 @@ class MessagePreviewGenerator
         array $message
     ): string {
 
+        // Cek dulu sebelum body generik ($message['body'] selalu terisi
+        // teks placeholder "[Contact]" untuk tipe ini) - biar preview
+        // tampilkan nama kontak asli, bukan label generik.
+        if (($message['type'] ?? null) === 'contacts') {
+            return $this->resolveContactsText($message);
+        }
+
         if (!empty($message['body'])) {
             return $message['body'];
         }
@@ -38,5 +45,24 @@ class MessagePreviewGenerator
             'interactive' => '📋 Interactive',
             default => 'Message',
         };
+    }
+
+    protected function resolveContactsText(array $message): string
+    {
+        $contacts = $message['component']['contacts'] ?? [];
+
+        if (empty($contacts)) {
+            return '👤 Contact';
+        }
+
+        $name = $contacts[0]['name']['formatted_name']
+            ?? $contacts[0]['name']['first_name']
+            ?? 'Contact';
+
+        $extra = count($contacts) - 1;
+
+        return $extra > 0
+            ? "👤 {$name} (+{$extra} lainnya)"
+            : "👤 {$name}";
     }
 }
