@@ -111,6 +111,14 @@ class PhoneNumberService
         );
     }
 
+    public function updateSettings(string $phoneNumberId, array $settings): array
+    {
+        return $this->client->post(
+            "{$phoneNumberId}/settings",
+            $settings,
+        );
+    }
+
     public function health(string $phoneNumberId): array
     {
         return $this->client->get(
