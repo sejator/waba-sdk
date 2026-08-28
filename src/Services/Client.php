@@ -10,10 +10,37 @@ use Sejator\WabaSdk\Exceptions\GraphApiException;
 
 class Client
 {
+    protected ?int $retryTimes = null;
+    protected ?int $retrySleepMs = null;
+    protected ?int $requestTimeout = null;
+
     public function __construct(
         protected string $baseUrl,
         protected ?string $token = null,
     ) {}
+
+    /**
+     * Override retry/timeout HANYA untuk instance ini (clone, bukan ubah
+     * config global) - dipakai konsumen yang punya deadline ketat (mis.
+     * Calls API, batas 30-60 detik dari Meta) tanpa mempengaruhi default
+     * config('waba.http.retry.*') yang dipakai service lain.
+     */
+    public function withRetry(int $times, int $sleepMs = 500): static
+    {
+        $clone = clone $this;
+        $clone->retryTimes = $times;
+        $clone->retrySleepMs = $sleepMs;
+
+        return $clone;
+    }
+
+    public function withTimeout(int $seconds): static
+    {
+        $clone = clone $this;
+        $clone->requestTimeout = $seconds;
+
+        return $clone;
+    }
 
     /*
     |--------------------------------------------------------------------------
@@ -187,14 +214,14 @@ class Client
                 'X-Request-ID' => (string) str()->uuid(),
             ])
             ->timeout(
-                config('waba.http.timeout', 30),
+                $this->requestTimeout ?? config('waba.http.timeout', 30),
             )
             ->connectTimeout(
                 config('waba.http.connect_timeout', 10),
             )
             ->retry(
-                config('waba.http.retry.times', 2),
-                config('waba.http.retry.sleep', 500),
+                $this->retryTimes ?? config('waba.http.retry.times', 2),
+                $this->retrySleepMs ?? config('waba.http.retry.sleep', 500),
 
                 function ($exception) {
 
