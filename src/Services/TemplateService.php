@@ -111,6 +111,40 @@ class TemplateService
     }
 
     /**
+     * Template Analytics (sent/delivered/read/clicked/cost per hari).
+     *
+     * Endpoint reference: https://developers.facebook.com/docs/whatsapp/business-management-api/analytics
+     * `metric_types` dikirim comma-separated (BUKAN JSON array, beda dari
+     * `template_ids`) dan `template_ids` maksimal 10 per panggilan - Meta
+     * menolak lebih dari itu, jadi batching per 10 dilakukan di pemanggil.
+     *
+     * @param array<int,string> $templateIds Maksimal 10 ID.
+     * @param int|string $start Unix timestamp atau format YYYY-MM-DD.
+     * @param int|string $end Unix timestamp atau format YYYY-MM-DD.
+     * @param array<int,string> $metricTypes
+     */
+    public function analytics(
+        string $wabaId,
+        array $templateIds,
+        int|string $start,
+        int|string $end,
+        array $metricTypes = ['sent', 'delivered', 'read', 'clicked', 'cost'],
+        string $granularity = 'DAILY',
+    ): array {
+
+        return $this->client->get(
+            "/{$wabaId}/template_analytics",
+            [
+                'start' => $start,
+                'end' => $end,
+                'granularity' => $granularity,
+                'metric_types' => implode(',', $metricTypes),
+                'template_ids' => '[' . implode(',', $templateIds) . ']',
+            ],
+        );
+    }
+
+    /**
      * Delete template.
      */
     public function delete(string $wabaId, string $name): bool
