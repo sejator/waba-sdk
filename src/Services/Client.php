@@ -264,14 +264,18 @@ class Client
             return $response->json() ?? [];
         }
 
-        $this->logFailedResponse(
-            $response,
-        );
-
-        throw GraphApiException::fromResponse(
+        $exception = GraphApiException::fromResponse(
             $response->json(),
             $response->status(),
         );
+
+        if (!$exception->isFeatureNotEnabled()) {
+            $this->logFailedResponse(
+                $response,
+            );
+        }
+
+        throw $exception;
     }
 
     protected function logFailedResponse(Response $response): void

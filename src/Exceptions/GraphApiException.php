@@ -190,6 +190,22 @@ class GraphApiException extends WabaException
     }
 
     /**
+     * Fitur Meta belum di-enable untuk WABA ini (mis. Template Insights) -
+     * status akun, bukan bug pemanggil, jangan di-log sebagai error di
+     * Client::logFailedResponse().
+     */
+    public function isFeatureNotEnabled(): bool
+    {
+        return in_array(
+            $this->subcode,
+            [
+                4182004, // Template Insights have not been enabled for this WhatsApp Business Account.
+            ],
+            true,
+        );
+    }
+
+    /**
      * Validation error.
      */
     public function isValidationError(): bool
