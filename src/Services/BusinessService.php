@@ -53,6 +53,21 @@ class BusinessService
             ));
     }
 
+    /**
+     * Status business verification portfolio pemilik WABA (VERIFIED,
+     * NOT_VERIFIED, PENDING, REJECTED, dst) - null kalau Meta tidak
+     * mengembalikannya.
+     */
+    public function businessVerificationStatus(string $wabaId): ?string
+    {
+        $response = $this->client->get(
+            $wabaId,
+            ['fields' => 'business_verification_status'],
+        );
+
+        return data_get($response, 'business_verification_status');
+    }
+
     public function reviewStatus(string $wabaId): array
     {
 
