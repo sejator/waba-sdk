@@ -8,13 +8,24 @@ class ConversationalAutomationService
         protected Client $client,
     ) {}
 
+    /**
+     * "conversational_automation" adalah FIELD pada node phone number, bukan
+     * edge terpisah - GET ke "{id}/conversational_automation" langsung
+     * memicu error Graph API #100 "nonexisting field".
+     */
     public function get(string $phoneNumberId): array
     {
-        return $this->client->get(
-            "{$phoneNumberId}/conversational_automation",
+        $response = $this->client->get(
+            $phoneNumberId,
             [
-                'fields' => 'enable_welcome_message,commands,prompts',
+                'fields' => 'conversational_automation',
             ],
+        );
+
+        return data_get(
+            $response,
+            'conversational_automation',
+            [],
         );
     }
 
