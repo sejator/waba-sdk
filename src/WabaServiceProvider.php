@@ -5,11 +5,15 @@ namespace Sejator\WabaSdk;
 use Illuminate\Support\ServiceProvider;
 use Sejator\WabaSdk\Contracts\StateStore;
 use Sejator\WabaSdk\Contracts\TokenStore;
+use Sejator\WabaSdk\Services\BlockListService;
+use Sejator\WabaSdk\Services\BusinessProfileService;
 use Sejator\WabaSdk\Services\BusinessService;
 use Sejator\WabaSdk\Services\Client;
+use Sejator\WabaSdk\Services\ConversationalAutomationService;
 use Sejator\WabaSdk\Services\EmbeddedSignupService;
 use Sejator\WabaSdk\Services\MessageService;
 use Sejator\WabaSdk\Services\PhoneNumberService;
+use Sejator\WabaSdk\Services\QrCodeService;
 use Sejator\WabaSdk\Services\TemplateService;
 use Sejator\WabaSdk\Services\WabaResolverService;
 use Sejator\WabaSdk\Support\Auth\CacheTokenStore;
@@ -57,6 +61,34 @@ class WabaServiceProvider extends ServiceProvider
         $this->app->singleton(
             PhoneNumberService::class,
             fn($app) => new PhoneNumberService(
+                $app->make(Client::class)
+            )
+        );
+
+        $this->app->singleton(
+            BusinessProfileService::class,
+            fn($app) => new BusinessProfileService(
+                $app->make(Client::class)
+            )
+        );
+
+        $this->app->singleton(
+            BlockListService::class,
+            fn($app) => new BlockListService(
+                $app->make(Client::class)
+            )
+        );
+
+        $this->app->singleton(
+            QrCodeService::class,
+            fn($app) => new QrCodeService(
+                $app->make(Client::class)
+            )
+        );
+
+        $this->app->singleton(
+            ConversationalAutomationService::class,
+            fn($app) => new ConversationalAutomationService(
                 $app->make(Client::class)
             )
         );

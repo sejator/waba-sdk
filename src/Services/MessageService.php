@@ -130,4 +130,24 @@ class MessageService
             ]
         );
     }
+
+    /**
+     * Tandai pesan masuk sudah dibaca + tampilkan bubble "sedang mengetik"
+     * (maks 25 detik atau sampai balasan terkirim) - tidak lewat send()
+     * karena shape-nya beda (tanpa "to"/"type" standar pesan keluar).
+     */
+    public function sendTypingIndicator(string $phoneNumberId, string $messageId): array
+    {
+        return $this->client->post(
+            $this->endpoint($phoneNumberId),
+            [
+                'messaging_product' => 'whatsapp',
+                'status' => 'read',
+                'message_id' => $messageId,
+                'typing_indicator' => [
+                    'type' => 'text',
+                ],
+            ]
+        );
+    }
 }
