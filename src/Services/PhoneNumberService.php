@@ -122,6 +122,35 @@ class PhoneNumberService
     }
 
     /**
+     * Ajukan perubahan display name. Meta mengirim parameter sebagai query
+     * string pada POST (bukan JSON body) - maks 10x/30 hari, hasil review
+     * dikirim via webhook phone_number_name_update.
+     */
+    public function requestDisplayNameChange(string $phoneNumberId, string $newDisplayName): array
+    {
+        return $this->client->postWithQuery(
+            $phoneNumberId,
+            [
+                'new_display_name' => $newDisplayName,
+            ],
+        );
+    }
+
+    /**
+     * Status pengajuan display name yang sedang ditinjau Meta (belum tentu
+     * ada, kalau tidak ada perubahan pending field-nya kosong).
+     */
+    public function pendingDisplayNameChange(string $phoneNumberId): array
+    {
+        return $this->client->get(
+            $phoneNumberId,
+            [
+                'fields' => 'new_display_name,new_name_status',
+            ],
+        );
+    }
+
+    /**
      * Status Official Business Account (OBA) nomor ini, dinormalisasi ke
      * ['oba_status' => ?string, 'status_message' => ?string]. Dokumentasi
      * Meta memberi dua bentuk respons (edge /official_business_account
